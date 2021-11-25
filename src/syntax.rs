@@ -1,4 +1,4 @@
-use crate::Trace;
+use crate::trace::*;
 
 pub type Time = u8;
 
@@ -20,21 +20,23 @@ pub enum UnaryOp {
     Not,
     Next,
     Globally,
-    // GloballyLeq(Time),
-    // GloballyGneq(Time),
-    // FinallyLeq(Time),
+    GloballyLeq(Time),
+    GloballyGneq(Time),
+    FinallyLeq(Time),
 }
 
 #[derive(Debug, Clone, Copy)]
 pub enum BinaryOp {
     And,
     Or,
-    // Release,
-    // UntillLeq(Time),
-    // ReleaseLeq(Time),
-    // ReleaseGneq(Time),
+    Release,
+    ReleaseLeq(Time),
+    ReleaseGneq(Time),
+    UntillLeq(Time),
 }
 
+// Possible optimization: use Rc instead of Box
+#[derive(Debug, Clone)]
 pub enum SyntaxTree {
     Zeroary {
         op: ZeroaryOp,
@@ -51,7 +53,7 @@ pub enum SyntaxTree {
 }
 
 impl SyntaxTree {
-    pub fn eval<'a, const N: usize>(&self, trace: Trace<'a, N>) -> bool {
+    pub fn eval<const N: usize>(&self, trace: Trace<N>) -> bool {
         match self {
             SyntaxTree::Zeroary { op } => match op {
                 ZeroaryOp::False => false,
@@ -61,18 +63,59 @@ impl SyntaxTree {
                     .cloned()
                     .unwrap_or(false),
             },
-            SyntaxTree::Unary { op, child } => match op {
+            SyntaxTree::Unary { op, child } => match *op {
                 UnaryOp::Not => !child.eval(trace),
-                UnaryOp::Next => child.eval(&trace[1..]),
+                UnaryOp::Next => {
+                    if trace.len() > 0 {
+                        child.eval(&trace[1..])
+                    } else {
+                        false
+                    }
+                }
                 UnaryOp::Globally => (0..trace.len()).all(|t| child.eval(&trace[t..])),
+                UnaryOp::GloballyLeq(time) => {
+                    (0..(time as usize + 1).min(trace.len())).all(|t| child.eval(&trace[t..]))
+                }
+                UnaryOp::GloballyGneq(time) => {
+                    (time as usize + 1..trace.len()).all(|t| child.eval(&trace[t..]))
+                }
+                UnaryOp::FinallyLeq(time) => {
+                    (0..(time as usize + 1).min(trace.len())).any(|t| child.eval(&trace[t..]))
+                }
             },
             SyntaxTree::Binary {
                 op,
                 left_child,
                 right_child,
-            } => match op {
+            } => match *op {
                 BinaryOp::And => left_child.eval(trace) && right_child.eval(trace),
                 BinaryOp::Or => left_child.eval(trace) || right_child.eval(trace),
+                BinaryOp::Release => {
+                    // TODO: it's probably possible to optimize this
+                    let release = (0..trace.len())
+                        .find(|t| left_child.eval(&trace[*t..]))
+                        .unwrap_or(trace.len());
+                    (0..=release).all(|t| right_child.eval(&trace[t..]))
+                }
+                BinaryOp::ReleaseLeq(time) => {
+                    let release = (0..=time as usize)
+                        .find(|t| left_child.eval(&trace[(*t).min(trace.len())..]))
+                        .unwrap_or(time as usize);
+                    (0..=release).all(|t| right_child.eval(&trace[t.min(trace.len())..]))
+                }
+                BinaryOp::ReleaseGneq(time) => {
+                    let release = (time as usize + 1..trace.len())
+                        .find(|t| left_child.eval(&trace[(*t).min(trace.len())..]))
+                        .unwrap_or(trace.len());
+                    (time as usize + 1..=release)
+                        .all(|t| right_child.eval(&trace[t.min(trace.len())..]))
+                }
+                BinaryOp::UntillLeq(time) => {
+                    let until = (0..=time as usize)
+                        .find(|t| right_child.eval(&trace[(*t).min(trace.len())..]))
+                        .unwrap_or(time as usize + 1);
+                    (0..until).all(|t| left_child.eval(&trace[t.min(trace.len())..]))
+                }
             },
         }
     }
@@ -152,6 +195,48 @@ mod eval {
     }
 
     #[test]
+    fn globally_leq() {
+        let formula = SyntaxTree::Unary {
+            op: UnaryOp::GloballyLeq(1),
+            child: Box::new(ATOM_0),
+        };
+
+        let trace = [[true], [true], [false]];
+        assert!(formula.eval(&trace));
+
+        let trace = [[true], [false], [true]];
+        assert!(!formula.eval(&trace));
+    }
+
+    #[test]
+    fn globally_gneq() {
+        let formula = SyntaxTree::Unary {
+            op: UnaryOp::GloballyGneq(0),
+            child: Box::new(ATOM_0),
+        };
+
+        let trace = [[false], [true], [true]];
+        assert!(formula.eval(&trace));
+
+        let trace = [[true], [false], [true]];
+        assert!(!formula.eval(&trace));
+    }
+
+    #[test]
+    fn finally_leq() {
+        let formula = SyntaxTree::Unary {
+            op: UnaryOp::FinallyLeq(1),
+            child: Box::new(ATOM_0),
+        };
+
+        let trace = [[false], [true], [false]];
+        assert!(formula.eval(&trace));
+
+        let trace = [[false], [false], [true]];
+        assert!(!formula.eval(&trace));
+    }
+
+    #[test]
     fn and() {
         let formula = SyntaxTree::Binary {
             op: BinaryOp::And,
@@ -178,6 +263,69 @@ mod eval {
         assert!(formula.eval(&trace));
 
         let trace = [[false, false]];
+        assert!(!formula.eval(&trace));
+    }
+
+    #[test]
+    fn release() {
+        let formula = SyntaxTree::Binary {
+            op: BinaryOp::Release,
+            left_child: Box::new(ATOM_0),
+            right_child: Box::new(ATOM_1),
+        };
+
+        let trace = [[false, true], [true, true], [false, false]];
+        assert!(formula.eval(&trace));
+
+        let trace = [[false, true], [true, false], [false, false]];
+        assert!(!formula.eval(&trace));
+    }
+
+    #[test]
+    fn release_leq() {
+        let formula = SyntaxTree::Binary {
+            op: BinaryOp::ReleaseLeq(1),
+            left_child: Box::new(ATOM_0),
+            right_child: Box::new(ATOM_1),
+        };
+
+        let trace = [[false, true], [false, true], [false, false]];
+        assert!(formula.eval(&trace));
+
+        let trace = [[false, true], [true, false], [false, false]];
+        assert!(!formula.eval(&trace));
+    }
+
+    #[test]
+    fn release_gneq() {
+        let formula = SyntaxTree::Binary {
+            op: BinaryOp::ReleaseGneq(0),
+            left_child: Box::new(ATOM_0),
+            right_child: Box::new(ATOM_1),
+        };
+
+        let trace = [[false, false], [false, true], [true, true], [false, false]];
+        assert!(formula.eval(&trace));
+
+        let trace = [[true, true], [false, true], [true, false], [false, false]];
+        assert!(!formula.eval(&trace));
+    }
+
+    #[test]
+    fn until_leq() {
+        let formula = SyntaxTree::Binary {
+            op: BinaryOp::UntillLeq(1),
+            left_child: Box::new(ATOM_0),
+            right_child: Box::new(ATOM_1),
+        };
+
+        let trace = [[true, false], [false, true], [false, false]];
+        assert!(formula.eval(&trace));
+
+        let trace = [[true, false], [true, false], [false, false]];
+        assert!(formula.eval(&trace));
+
+        let trace = [[true, false], [false, false]];
         assert!(!formula.eval(&trace));
     }
 }
