@@ -36,6 +36,8 @@ impl<'a, const N: usize> Sample<'a, N> {
 
 #[cfg(test)]
 mod consistency {
+    use std::sync::Arc;
+
     use super::*;
 
     const ATOM_0: SyntaxTree = SyntaxTree::Zeroary {
@@ -55,8 +57,8 @@ mod consistency {
 
         let formula = SyntaxTree::Binary {
             op: BinaryOp::And,
-            left_child: Box::new(ATOM_0),
-            right_child: Box::new(ATOM_1),
+            left_child: Arc::new(ATOM_0),
+            right_child: Arc::new(ATOM_1),
         };
 
         assert!(sample.is_consistent(&formula));

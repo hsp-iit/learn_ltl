@@ -1,18 +1,21 @@
 use crate::trace::*;
+use std::{fmt, sync::Arc};
 
 pub type Time = u8;
-
-// #[derive(Debug, Clone, Copy)]
-// pub enum Operator {
-//     Zeroary(ZeroaryOp),
-//     Unary(UnaryOp),
-//     Binary(BinaryOp),
-// }
 
 #[derive(Debug, Clone, Copy)]
 pub enum ZeroaryOp {
     AtomicProp(usize),
     False,
+}
+
+impl fmt::Display for ZeroaryOp {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match *self {
+            ZeroaryOp::AtomicProp(n) => write!(f, "x{}", n),
+            ZeroaryOp::False => write!(f, "⊥"),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -25,6 +28,19 @@ pub enum UnaryOp {
     FinallyLeq(Time),
 }
 
+impl fmt::Display for UnaryOp {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match *self {
+            UnaryOp::FinallyLeq(n) => write!(f, "F≤{}", n),
+            UnaryOp::Globally => write!(f, "G"),
+            UnaryOp::GloballyGneq(n) => write!(f, "G>{}", n),
+            UnaryOp::GloballyLeq(n) => write!(f, "G≤{}", n),
+            UnaryOp::Next => write!(f, "X"),
+            UnaryOp::Not => write!(f, "¬"),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 pub enum BinaryOp {
     And,
@@ -35,7 +51,19 @@ pub enum BinaryOp {
     UntillLeq(Time),
 }
 
-// Possible optimization: use Rc instead of Box
+impl fmt::Display for BinaryOp {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match *self {
+            BinaryOp::And => write!(f, "∧"),
+            BinaryOp::Or => write!(f, "∨"),
+            BinaryOp::Release => write!(f, "R"),
+            BinaryOp::ReleaseGneq(t) => write!(f, "R>{}", t),
+            BinaryOp::ReleaseLeq(t) => write!(f, "R≤{}", t),
+            BinaryOp::UntillLeq(t) => write!(f, "U≤{}", t),
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub enum SyntaxTree {
     Zeroary {
@@ -43,13 +71,27 @@ pub enum SyntaxTree {
     },
     Unary {
         op: UnaryOp,
-        child: Box<SyntaxTree>,
+        child: Arc<SyntaxTree>,
     },
     Binary {
         op: BinaryOp,
-        left_child: Box<SyntaxTree>,
-        right_child: Box<SyntaxTree>,
+        left_child: Arc<SyntaxTree>,
+        right_child: Arc<SyntaxTree>,
     },
+}
+
+impl fmt::Display for SyntaxTree {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            SyntaxTree::Zeroary { op } => write!(f, "{}", op),
+            SyntaxTree::Unary { op, child } => write!(f, "{}({})", op, child),
+            SyntaxTree::Binary {
+                op,
+                left_child,
+                right_child,
+            } => write!(f, "({}){}({})", left_child, op, right_child),
+        }
+    }
 }
 
 impl SyntaxTree {
@@ -156,7 +198,7 @@ mod eval {
     fn not() {
         let formula = SyntaxTree::Unary {
             op: UnaryOp::Not,
-            child: Box::new(ATOM_0),
+            child: Arc::new(ATOM_0),
         };
 
         let trace = [[false]];
@@ -170,7 +212,7 @@ mod eval {
     fn next() {
         let formula = SyntaxTree::Unary {
             op: UnaryOp::Next,
-            child: Box::new(ATOM_0),
+            child: Arc::new(ATOM_0),
         };
 
         let trace = [[false], [true]];
@@ -184,7 +226,7 @@ mod eval {
     fn globally() {
         let formula = SyntaxTree::Unary {
             op: UnaryOp::Globally,
-            child: Box::new(ATOM_0),
+            child: Arc::new(ATOM_0),
         };
 
         let trace = [[true], [true], [true]];
@@ -198,7 +240,7 @@ mod eval {
     fn globally_leq() {
         let formula = SyntaxTree::Unary {
             op: UnaryOp::GloballyLeq(1),
-            child: Box::new(ATOM_0),
+            child: Arc::new(ATOM_0),
         };
 
         let trace = [[true], [true], [false]];
@@ -212,7 +254,7 @@ mod eval {
     fn globally_gneq() {
         let formula = SyntaxTree::Unary {
             op: UnaryOp::GloballyGneq(0),
-            child: Box::new(ATOM_0),
+            child: Arc::new(ATOM_0),
         };
 
         let trace = [[false], [true], [true]];
@@ -226,7 +268,7 @@ mod eval {
     fn finally_leq() {
         let formula = SyntaxTree::Unary {
             op: UnaryOp::FinallyLeq(1),
-            child: Box::new(ATOM_0),
+            child: Arc::new(ATOM_0),
         };
 
         let trace = [[false], [true], [false]];
@@ -240,8 +282,8 @@ mod eval {
     fn and() {
         let formula = SyntaxTree::Binary {
             op: BinaryOp::And,
-            left_child: Box::new(ATOM_0),
-            right_child: Box::new(ATOM_1),
+            left_child: Arc::new(ATOM_0),
+            right_child: Arc::new(ATOM_1),
         };
 
         let trace = [[true, true]];
@@ -255,8 +297,8 @@ mod eval {
     fn or() {
         let formula = SyntaxTree::Binary {
             op: BinaryOp::Or,
-            left_child: Box::new(ATOM_0),
-            right_child: Box::new(ATOM_1),
+            left_child: Arc::new(ATOM_0),
+            right_child: Arc::new(ATOM_1),
         };
 
         let trace = [[true, false]];
@@ -270,14 +312,14 @@ mod eval {
     fn release() {
         let formula = SyntaxTree::Binary {
             op: BinaryOp::Release,
-            left_child: Box::new(ATOM_0),
-            right_child: Box::new(ATOM_1),
+            left_child: Arc::new(ATOM_0),
+            right_child: Arc::new(ATOM_1),
         };
 
         let trace = [[false, true], [true, true], [false, false]];
         assert!(formula.eval(&trace));
 
-        let trace = [[false, true], [true, false], [false, false]];
+        let trace = [[false, true], [true, false], [false, true]];
         assert!(!formula.eval(&trace));
     }
 
@@ -285,8 +327,8 @@ mod eval {
     fn release_leq() {
         let formula = SyntaxTree::Binary {
             op: BinaryOp::ReleaseLeq(1),
-            left_child: Box::new(ATOM_0),
-            right_child: Box::new(ATOM_1),
+            left_child: Arc::new(ATOM_0),
+            right_child: Arc::new(ATOM_1),
         };
 
         let trace = [[false, true], [false, true], [false, false]];
@@ -300,8 +342,8 @@ mod eval {
     fn release_gneq() {
         let formula = SyntaxTree::Binary {
             op: BinaryOp::ReleaseGneq(0),
-            left_child: Box::new(ATOM_0),
-            right_child: Box::new(ATOM_1),
+            left_child: Arc::new(ATOM_0),
+            right_child: Arc::new(ATOM_1),
         };
 
         let trace = [[false, false], [false, true], [true, true], [false, false]];
@@ -315,8 +357,8 @@ mod eval {
     fn until_leq() {
         let formula = SyntaxTree::Binary {
             op: BinaryOp::UntillLeq(1),
-            left_child: Box::new(ATOM_0),
-            right_child: Box::new(ATOM_1),
+            left_child: Arc::new(ATOM_0),
+            right_child: Arc::new(ATOM_1),
         };
 
         let trace = [[true, false], [false, true], [false, false]];

@@ -2,6 +2,9 @@
 
 use crate::syntax::*;
 use crate::trace::*;
+use itertools::Itertools;
+// use std::Arc::Arc;
+use std::sync::Arc;
 
 // pub fn learn<const N: usize>(sample: Sample<N>) -> Option<SyntaxTree> {
 //     unimplemented!();
@@ -14,8 +17,8 @@ use crate::trace::*;
 #[derive(Debug, Clone)]
 enum SkeletonTree {
     Zeroary,
-    Unary(Box<SkeletonTree>),
-    Binary(Box<(SkeletonTree, SkeletonTree)>),
+    Unary(Arc<SkeletonTree>),
+    Binary((Arc<SkeletonTree>, Arc<SkeletonTree>)),
 }
 
 impl SkeletonTree {
@@ -23,85 +26,124 @@ impl SkeletonTree {
         match self {
             SkeletonTree::Zeroary => 1,
             SkeletonTree::Unary(child) => child.depth() + 1,
-            SkeletonTree::Binary(children) => children.0.depth().max(children.1.depth()) + 1,
+            SkeletonTree::Binary((left_child, right_child)) => {
+                left_child.depth().max(right_child.depth()) + 1
+            }
         }
     }
 }
 
-pub fn brute_solve<const N: usize>(sample: &Sample<N>) -> Option<SyntaxTree> {
-    gen_skeleton_trees(5).iter().find_map(|skeleton| {
-        gen_formulae(N, sample.time_lenght(), skeleton)
+pub fn brute_solve<const N: usize>(sample: &Sample<N>, log: bool) -> Option<Arc<SyntaxTree>> {
+    (0..).into_iter().find_map(|size| {
+        if log {
+            println!("Searching formulae of size {}", size);
+        }
+        gen_skeleton_trees(size)
             .into_iter()
+            .flat_map(|skeleton| gen_formulae(N, sample.time_lenght(), &skeleton))
             .find(|formula| sample.is_consistent(formula))
     })
 }
 
-// Should be possible to compute skeleton trees at compile time
-fn gen_skeleton_trees(max_depth: u8) -> Vec<SkeletonTree> {
-    use itertools::Itertools;
+pub fn par_brute_solve<const N: usize>(sample: &Sample<N>, log: bool) -> Option<Arc<SyntaxTree>> {
+    use rayon::prelude::*;
 
-    let mut skeletons = vec![SkeletonTree::Zeroary];
-    if max_depth > 1 {
-        let smaller_skeletons = gen_skeleton_trees(max_depth - 1);
+    (0..).into_iter().find_map(|size| {
+        if log {
+            println!("Searching formulae of size {}", size);
+        }
+        gen_skeleton_trees(size)
+            .into_iter()
+            .flat_map(|skeleton| gen_formulae(N, sample.time_lenght(), &skeleton))
+            .par_bridge()
+            .find_any(|formula| sample.is_consistent(formula))
+    })
+}
+
+// Should be possible to compute skeleton trees at compile time
+fn gen_skeleton_trees(size: usize) -> Vec<Arc<SkeletonTree>> {
+    let mut skeletons = vec![Arc::new(SkeletonTree::Zeroary)];
+    if size > 0 {
+        let smaller_skeletons = gen_skeleton_trees(size - 1);
         skeletons.extend(
             smaller_skeletons
                 .iter()
-                .map(|child| SkeletonTree::Unary(Box::new(child.clone()))),
+                .map(|child| Arc::new(SkeletonTree::Unary(child.clone()))),
         );
-        skeletons.extend(
-            smaller_skeletons
-                .iter()
-                .cartesian_product(&smaller_skeletons)
-                .map(|children| {
-                    SkeletonTree::Binary(Box::new((children.0.clone(), children.1.clone())))
-                }),
-        );
+        for left_size in 0..size {
+            let left_smaller_skeletons = gen_skeleton_trees(left_size);
+            let right_smaller_skeletons = gen_skeleton_trees(size - 1 - left_size);
+
+            skeletons.extend(
+                left_smaller_skeletons
+                    .iter()
+                    .cartesian_product(right_smaller_skeletons.iter())
+                    .map(|(left_child, right_child)| {
+                        Arc::new(SkeletonTree::Binary((
+                            left_child.clone(),
+                            right_child.clone(),
+                        )))
+                    }),
+            );
+        }
     }
     skeletons
 }
 
-fn gen_formulae(atomics: usize, time_lenght: u8, skeleton: &SkeletonTree) -> Vec<SyntaxTree> {
-    use itertools::Itertools;
-
+fn gen_formulae(atomics: usize, time_lenght: u8, skeleton: &SkeletonTree) -> Vec<Arc<SyntaxTree>> {
     match skeleton {
         SkeletonTree::Zeroary => {
             let mut trees = (0..atomics)
-                .map(|n| SyntaxTree::Zeroary {
-                    op: ZeroaryOp::AtomicProp(n),
+                .map(|n| {
+                    Arc::new(SyntaxTree::Zeroary {
+                        op: ZeroaryOp::AtomicProp(n),
+                    })
                 })
-                .collect::<Vec<SyntaxTree>>();
-            trees.push(SyntaxTree::Zeroary {
+                .collect::<Vec<Arc<SyntaxTree>>>();
+            trees.push(Arc::new(SyntaxTree::Zeroary {
                 op: ZeroaryOp::False,
-            });
+            }));
             trees
         }
         SkeletonTree::Unary(child) => {
             let mut trees = Vec::new();
             let children = gen_formulae(atomics, time_lenght, child);
-            trees.extend(children.iter().map(|child| SyntaxTree::Unary {
-                op: UnaryOp::Not,
-                child: Box::new(child.clone()),
+            trees.extend(children.iter().map(|child| {
+                Arc::new(SyntaxTree::Unary {
+                    op: UnaryOp::Not,
+                    child: child.clone(),
+                })
             }));
-            trees.extend(children.iter().map(|child| SyntaxTree::Unary {
-                op: UnaryOp::Next,
-                child: Box::new(child.clone()),
+            trees.extend(children.iter().map(|child| {
+                Arc::new(SyntaxTree::Unary {
+                    op: UnaryOp::Next,
+                    child: child.clone(),
+                })
             }));
-            trees.extend(children.iter().map(|child| SyntaxTree::Unary {
-                op: UnaryOp::Globally,
-                child: Box::new(child.clone()),
+            trees.extend(children.iter().map(|child| {
+                Arc::new(SyntaxTree::Unary {
+                    op: UnaryOp::Globally,
+                    child: child.clone(),
+                })
             }));
             for time in 0..time_lenght {
-                trees.extend(children.iter().map(|child| SyntaxTree::Unary {
-                    op: UnaryOp::GloballyLeq(time),
-                    child: Box::new(child.clone()),
+                trees.extend(children.iter().map(|child| {
+                    Arc::new(SyntaxTree::Unary {
+                        op: UnaryOp::GloballyLeq(time),
+                        child: child.clone(),
+                    })
                 }));
-                trees.extend(children.iter().map(|child| SyntaxTree::Unary {
-                    op: UnaryOp::GloballyGneq(time),
-                    child: Box::new(child.clone()),
+                trees.extend(children.iter().map(|child| {
+                    Arc::new(SyntaxTree::Unary {
+                        op: UnaryOp::GloballyGneq(time),
+                        child: child.clone(),
+                    })
                 }));
-                trees.extend(children.iter().map(|child| SyntaxTree::Unary {
-                    op: UnaryOp::FinallyLeq(time),
-                    child: Box::new(child.clone()),
+                trees.extend(children.iter().map(|child| {
+                    Arc::new(SyntaxTree::Unary {
+                        op: UnaryOp::FinallyLeq(time),
+                        child: child.clone(),
+                    })
                 }));
             }
             trees
@@ -113,54 +155,48 @@ fn gen_formulae(atomics: usize, time_lenght: u8, skeleton: &SkeletonTree) -> Vec
             let children = left_children
                 .into_iter()
                 .cartesian_product(right_children.into_iter());
-            trees.extend(
-                children
-                    .clone()
-                    .map(|(left_child, right_child)| SyntaxTree::Binary {
-                        op: BinaryOp::And,
-                        left_child: Box::new(left_child),
-                        right_child: Box::new(right_child),
-                    }),
-            );
-            trees.extend(
-                children
-                    .clone()
-                    .map(|(left_child, right_child)| SyntaxTree::Binary {
-                        op: BinaryOp::Or,
-                        left_child: Box::new(left_child),
-                        right_child: Box::new(right_child),
-                    }),
-            );
-            trees.extend(
-                children
-                    .clone()
-                    .map(|(left_child, right_child)| SyntaxTree::Binary {
-                        op: BinaryOp::Release,
-                        left_child: Box::new(left_child),
-                        right_child: Box::new(right_child),
-                    }),
-            );
+            trees.extend(children.clone().map(|(left_child, right_child)| {
+                Arc::new(SyntaxTree::Binary {
+                    op: BinaryOp::And,
+                    left_child,
+                    right_child,
+                })
+            }));
+            trees.extend(children.clone().map(|(left_child, right_child)| {
+                Arc::new(SyntaxTree::Binary {
+                    op: BinaryOp::Or,
+                    left_child,
+                    right_child,
+                })
+            }));
+            trees.extend(children.clone().map(|(left_child, right_child)| {
+                Arc::new(SyntaxTree::Binary {
+                    op: BinaryOp::Release,
+                    left_child,
+                    right_child,
+                })
+            }));
             for time in 0..time_lenght {
                 trees.extend(children.clone().map(|(left_child, right_child)| {
-                    SyntaxTree::Binary {
+                    Arc::new(SyntaxTree::Binary {
                         op: BinaryOp::ReleaseGneq(time),
-                        left_child: Box::new(left_child),
-                        right_child: Box::new(right_child),
-                    }
+                        left_child,
+                        right_child,
+                    })
                 }));
                 trees.extend(children.clone().map(|(left_child, right_child)| {
-                    SyntaxTree::Binary {
+                    Arc::new(SyntaxTree::Binary {
                         op: BinaryOp::ReleaseLeq(time),
-                        left_child: Box::new(left_child),
-                        right_child: Box::new(right_child),
-                    }
+                        left_child,
+                        right_child,
+                    })
                 }));
                 trees.extend(children.clone().map(|(left_child, right_child)| {
-                    SyntaxTree::Binary {
+                    Arc::new(SyntaxTree::Binary {
                         op: BinaryOp::UntillLeq(time),
-                        left_child: Box::new(left_child),
-                        right_child: Box::new(right_child),
-                    }
+                        left_child,
+                        right_child,
+                    })
                 }));
             }
             trees
