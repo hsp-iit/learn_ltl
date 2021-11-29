@@ -3,10 +3,27 @@ name = "learn_pltl_fast"
 version = "0.1.0"
 edition = "2021"
 
+[lib]
+name = "learn_pltl_fast"
+path = "src/lib.rs"
+
+[[bin]]
+name = "solver"
+path = "src/solver/main.rs"
+
+[[bin]]
+name = "sampler"
+path = "src/sampler/main.rs"
+
+[[bench]]
+name = "sample"
+harness = false
+
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 itertools = "0.10.*"
+rand = "0.8"
 rayon = "1.5.*"
 ron = "0.7.*"
 serde = { version = "1.0", features = ["derive"] }
@@ -15,7 +32,3 @@ serde_with = "1.11"
 
 [dev-dependencies]
 criterion = "0.3"
-
-[[bench]]
-name = "sample"
-harness = false

@@ -1,20 +1,27 @@
 use crate::syntax::*;
+use serde::{Deserialize, Serialize};
+use serde_with::*;
 
-pub type Trace<'a, const N: usize> = &'a [[bool; N]];
+pub type Trace<const N: usize> = Vec<[bool; N]>;
 
-#[derive(Debug)]
-pub struct Sample<'a, const N: usize> {
-    pub positive_traces: Vec<Trace<'a, N>>,
-    pub negative_traces: Vec<Trace<'a, N>>,
+#[serde_as]
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Sample<const N: usize> {
+    #[serde_as(as = "Vec<Vec<[_; N]>>")]
+    pub positive_traces: Vec<Trace<N>>,
+    #[serde_as(as = "Vec<Vec<[_; N]>>")]
+    pub negative_traces: Vec<Trace<N>>,
 }
 
-impl<'a, const N: usize> Sample<'a, N> {
+impl<const N: usize> Sample<N> {
     pub fn is_consistent(&self, formula: &SyntaxTree) -> bool {
-        self.positive_traces.iter().all(|trace| formula.eval(trace))
+        self.positive_traces
+            .iter()
+            .all(|trace| formula.eval(trace.as_slice()))
             && self
                 .negative_traces
                 .iter()
-                .all(|trace| !formula.eval(trace))
+                .all(|trace| !formula.eval(trace.as_slice()))
     }
 
     pub fn time_lenght(&self) -> Time {
@@ -51,8 +58,12 @@ mod consistency {
     #[test]
     fn and() {
         let sample = Sample {
-            positive_traces: vec![&[[true, true]]],
-            negative_traces: vec![&[[false, true]], &[[true, false]], &[[false, false]]],
+            positive_traces: vec![vec![[true, true]]],
+            negative_traces: vec![
+                vec![[false, true]],
+                vec![[true, false]],
+                vec![[false, false]],
+            ],
         };
 
         let formula = SyntaxTree::Binary {
