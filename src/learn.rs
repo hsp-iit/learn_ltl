@@ -49,11 +49,14 @@ pub fn par_brute_solve<const N: usize>(sample: &Sample<N>, log: bool) -> Option<
 
     (0..).into_iter().find_map(|size| {
         if log {
-            println!("Generating formulae of size {}", size);
+            print!("Generating formulae of size {}", size);
         }
         let trees = gen_skeleton_trees(size)
             .into_iter()
             .flat_map(|skeleton| gen_formulae(N, sample.time_lenght(), &skeleton));
+        // if log {
+        //     println!(": found {}", trees.clone().count());
+        // }            
         if log {
             println!("Searching formulae of size {}", size);
         }
@@ -65,14 +68,14 @@ pub fn par_brute_solve<const N: usize>(sample: &Sample<N>, log: bool) -> Option<
 
 // Should be possible to compute skeleton trees at compile time
 fn gen_skeleton_trees(size: usize) -> Vec<Arc<SkeletonTree>> {
-    let mut skeletons = vec![Arc::new(SkeletonTree::Zeroary)];
-    if size > 0 {
+    if size == 0 {
+        vec![Arc::new(SkeletonTree::Zeroary)]
+    } else {
         let smaller_skeletons = gen_skeleton_trees(size - 1);
-        skeletons.extend(
-            smaller_skeletons
+        let mut skeletons: Vec<Arc<SkeletonTree>> = smaller_skeletons
                 .iter()
-                .map(|child| Arc::new(SkeletonTree::Unary(child.clone()))),
-        );
+                .map(|child| Arc::new(SkeletonTree::Unary(child.clone())))
+                .collect();
         for left_size in 0..size {
             let left_smaller_skeletons = gen_skeleton_trees(left_size);
             let right_smaller_skeletons = gen_skeleton_trees(size - 1 - left_size);
@@ -89,8 +92,8 @@ fn gen_skeleton_trees(size: usize) -> Vec<Arc<SkeletonTree>> {
                     }),
             );
         }
+        skeletons
     }
-    skeletons
 }
 
 fn gen_formulae(atomics: usize, time_lenght: u8, skeleton: &SkeletonTree) -> Vec<Arc<SyntaxTree>> {
