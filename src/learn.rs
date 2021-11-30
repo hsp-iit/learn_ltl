@@ -3,6 +3,7 @@
 use crate::syntax::*;
 use crate::trace::*;
 use itertools::Itertools;
+use std::fmt::Binary;
 use std::sync::Arc;
 
 // pub fn learn<const N: usize>(sample: Sample<N>) -> Option<SyntaxTree> {
@@ -49,14 +50,14 @@ pub fn par_brute_solve<const N: usize>(sample: &Sample<N>, log: bool) -> Option<
 
     (0..).into_iter().find_map(|size| {
         if log {
-            print!("Generating formulae of size {}", size);
+            println!("Generating formulae of size {}", size);
         }
         let trees = gen_skeleton_trees(size)
             .into_iter()
             .flat_map(|skeleton| gen_formulae(N, sample.time_lenght(), &skeleton));
         // if log {
         //     println!(": found {}", trees.clone().count());
-        // }            
+        // }
         if log {
             println!("Searching formulae of size {}", size);
         }
@@ -73,9 +74,9 @@ fn gen_skeleton_trees(size: usize) -> Vec<Arc<SkeletonTree>> {
     } else {
         let smaller_skeletons = gen_skeleton_trees(size - 1);
         let mut skeletons: Vec<Arc<SkeletonTree>> = smaller_skeletons
-                .iter()
-                .map(|child| Arc::new(SkeletonTree::Unary(child.clone())))
-                .collect();
+            .iter()
+            .map(|child| Arc::new(SkeletonTree::Unary(child.clone())))
+            .collect();
         for left_size in 0..size {
             let left_smaller_skeletons = gen_skeleton_trees(left_size);
             let right_smaller_skeletons = gen_skeleton_trees(size - 1 - left_size);
@@ -387,11 +388,37 @@ fn check_and(left_child: &SyntaxTree, right_child: &SyntaxTree) -> bool {
         // (φ -> ψ_1) ∧ (φ -> ψ_2) ≡ φ -> (ψ_1 ∧ ψ_2)
         // (φ_1 -> ψ) ∧ (φ_2 -> ψ) ≡ (φ_1 ∨ φ_2) -> ψ
         (SyntaxTree::Binary { op: BinaryOp::Implies, left_child: l_1, right_child: r_1 }, SyntaxTree::Binary { op: BinaryOp::Implies, left_child: l_2, right_child: r_2 }) if *l_1 == *l_2 || *r_1 == *r_2 => false,
+        // (φ_1 U ψ) ∧ (φ_2 U ψ) ≡ (φ_1 ∧ φ_2) U ψleft_child: l_1
+        (SyntaxTree::Binary { op: BinaryOp::Until, right_child: r_1, .. }, SyntaxTree::Binary { op: BinaryOp::Until, right_child: r_2, .. }) if *r_1 == *r_2 => false,
         // Absorption laws
         (SyntaxTree::Binary { op: BinaryOp::Or, left_child: l_1, right_child: r_1 }, right_child) if *(l_1.as_ref()) == *right_child || *(r_1.as_ref()) == *right_child => false,
         (left_child, SyntaxTree::Binary { op: BinaryOp::Or, left_child: l_1, right_child: r_1 }) if *(l_1.as_ref()) == *left_child || *(r_1.as_ref()) == *left_child => false,
         // Distributive laws
         (SyntaxTree::Binary { op: BinaryOp::Or, left_child: l_1, right_child: r_1 }, SyntaxTree::Binary { op: BinaryOp::Or, left_child: l_2, right_child: r_2 }) if *l_1 == *l_2 || *l_1 == *r_2 || *r_1 == *l_2 || *r_1 == *r_2 => false,
+        // G φ ≡ φ ∧ X(G φ)
+        (
+            left_child,
+            SyntaxTree::Unary {
+                op: UnaryOp::Next,
+                child,
+            }
+        ) => if let SyntaxTree::Unary { op: UnaryOp::Globally, child } = child.as_ref() {
+            child.as_ref() != left_child
+        } else {
+            true
+        },
+        // G φ ≡ X(G φ) ∧ φ
+        (
+            SyntaxTree::Unary {
+                op: UnaryOp::Next,
+                child,
+            },
+            right_child,
+        ) => if let SyntaxTree::Unary { op: UnaryOp::Globally, child } = child.as_ref() {
+            child.as_ref() != right_child
+        } else {
+            true
+        },
         _ => true,
     }
 }
@@ -415,12 +442,115 @@ fn check_or(left_child: &SyntaxTree, right_child: &SyntaxTree) -> bool {
         | (SyntaxTree::Unary { op: UnaryOp::Finally, .. }, SyntaxTree::Unary { op: UnaryOp::Finally, .. }) => false,
         // (φ -> ψ_1) ∨ (φ -> ψ_2) ≡ φ -> (ψ_1 ∨ ψ_2)
         // (φ_1 -> ψ) ∨ (φ_2 -> ψ) ≡ (φ_1 ∧ φ_2) -> ψ
-        (SyntaxTree::Binary { op: BinaryOp::Implies, left_child: l_1, right_child: r_1 }, SyntaxTree::Binary { op: BinaryOp::Implies, left_child: l_2, right_child: r_2 }) if *l_1 == *l_2 || *r_1 == *r_2 => false,
+        (SyntaxTree::Binary { op: BinaryOp::Implies, left_child: l_1, right_child: r_1 }, SyntaxTree::Binary { op: BinaryOp::Implies, left_child: l_2, right_child: r_2 }) if l_1 == l_2 || r_1 == r_2 => false,
+        // (φ U ψ_1) ∨ (φ U ψ_2) ≡ φ U (ψ_1 ∨ ψ_2)
+        (SyntaxTree::Binary { op: BinaryOp::Until, left_child: l_1, .. }, SyntaxTree::Binary { op: BinaryOp::Until, left_child: l_2, .. }) if l_1 == l_2 => false,
         // Absorption laws
-        (SyntaxTree::Binary { op: BinaryOp::And, left_child: l_1, right_child: r_1 }, right_child) if *(l_1.as_ref()) == *right_child || *(r_1.as_ref()) == *right_child => false,
-        (left_child, SyntaxTree::Binary { op: BinaryOp::And, left_child: l_1, right_child: r_1 }) if *(l_1.as_ref()) == *left_child || *(r_1.as_ref()) == *left_child => false,
+        (SyntaxTree::Binary { op: BinaryOp::And, left_child: l_1, right_child: r_1 }, right_child) if l_1.as_ref() == right_child || r_1.as_ref() == right_child => false,
+        (left_child, SyntaxTree::Binary { op: BinaryOp::And, left_child: l_1, right_child: r_1 }) if l_1.as_ref() == left_child || r_1.as_ref() == left_child => false,
         // Distributive laws
-        (SyntaxTree::Binary { op: BinaryOp::And, left_child: l_1, right_child: r_1 }, SyntaxTree::Binary { op: BinaryOp::And, left_child: l_2, right_child: r_2 }) if *l_1 == *l_2 || *l_1 == *r_2 || *r_1 == *l_2 || *r_1 == *r_2 => false,
+        (SyntaxTree::Binary { op: BinaryOp::And, left_child: l_1, right_child: r_1 }, SyntaxTree::Binary { op: BinaryOp::And, left_child: l_2, right_child: r_2 }) if l_1 == l_2 || l_1 == r_2 || r_1 == l_2 || r_1 == r_2 => false,
+        // F φ ≡ φ ∨ X(F φ)
+        (
+            left_child,
+            SyntaxTree::Unary {
+                op: UnaryOp::Next,
+                child,
+            }
+        ) => if let SyntaxTree::Unary { op: UnaryOp::Finally, child } = child.as_ref() {
+            child.as_ref() != left_child
+        } else {
+            true
+        },
+        // F φ ≡ X(F φ) ∨ φ
+        (
+            SyntaxTree::Unary {
+                op: UnaryOp::Next,
+                child,
+            },
+            right_child,
+        ) => if let SyntaxTree::Unary { op: UnaryOp::Finally, child } = child.as_ref() {
+            child.as_ref() != right_child
+        } else {
+            true
+        },
+        // φ U ψ ≡ ψ ∨ ( φ ∧ X(φ U ψ) )
+        // φ U ψ ≡ ψ ∨ ( X(φ U ψ) ∧ φ )
+        (
+            left_child,
+            SyntaxTree::Binary {
+                op: BinaryOp::And,
+                left_child: l_1,
+                right_child: r_1,
+            }
+        ) => if let SyntaxTree::Unary {
+                op: UnaryOp::Next,
+                child,
+            } = r_1.as_ref() {
+                if let SyntaxTree::Binary {
+                    op: BinaryOp::Until,
+                    left_child: l_2,
+                    right_child: r_2,
+                } = child.as_ref() {
+                    !(left_child == r_2.as_ref() && l_1 == l_2)
+            } else if let SyntaxTree::Unary {
+                op: UnaryOp::Next,
+                child,
+            } = l_1.as_ref() {
+                if let SyntaxTree::Binary {
+                    op: BinaryOp::Until,
+                    left_child: l_2,
+                    right_child: r_2,
+                } = child.as_ref() {
+                    !(left_child == r_2.as_ref() && r_1 == l_2)
+                } else {
+                    true
+                }
+            } else {
+                true
+            }
+        } else {
+            true
+        }
+        // φ U ψ ≡ ( φ ∧ X(φ U ψ) ) ∨ ψ
+        // φ U ψ ≡ ( X(φ U ψ) ∧ φ ) ∨ ψ
+        (
+            SyntaxTree::Binary {
+                op: BinaryOp::And,
+                left_child: l_1,
+                right_child: r_1,
+            },
+            right_child
+        ) => if let SyntaxTree::Unary {
+                op: UnaryOp::Next,
+                child,
+            } = r_1.as_ref() {
+                if let SyntaxTree::Binary {
+                    op: BinaryOp::Until,
+                    left_child: l_2,
+                    right_child: r_2,
+                } = child.as_ref() {
+                    !(right_child == r_2.as_ref() && l_1 == l_2)
+            // // Made useless by commutativity optimization on ∧
+            } else if let SyntaxTree::Unary {
+                op: UnaryOp::Next,
+                child,
+            } = l_1.as_ref() {
+                if let SyntaxTree::Binary {
+                    op: BinaryOp::Until,
+                    left_child: l_2,
+                    right_child: r_2,
+                } = child.as_ref() {
+                    !(right_child == r_2.as_ref() && r_1 == l_2)
+                } else {
+                    true
+                }
+            } else {
+                true
+            }
+        } else {
+            true
+        }
         _ => true,
     }
 }
@@ -453,6 +583,14 @@ fn check_until(left_child: &SyntaxTree, right_child: &SyntaxTree) -> bool {
                 op: UnaryOp::Next, ..
             },
         ) => false,
+        (
+            left_child,
+            SyntaxTree::Binary {
+                op: BinaryOp::Until,
+                left_child: l_1,
+                ..
+            },
+        ) if left_child == l_1.as_ref() => false,
         _ => true,
     }
 }
