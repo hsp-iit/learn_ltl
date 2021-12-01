@@ -27,10 +27,6 @@ fn solve_sample(c: &mut Criterion) {
     c.bench_function("solve sample 0077, par", |b| {
         b.iter(|| par_brute_solve(black_box(&sample), false))
     });
-
-    c.bench_function("solve sample 0077, mmztn", |b| {
-        b.iter(|| mmztn_solve(black_box(&sample), false))
-    });
 }
 
 criterion_group!(benches, solve_sample);
