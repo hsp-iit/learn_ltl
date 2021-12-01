@@ -148,11 +148,13 @@ pub fn brute_solve<const N: usize>(sample: &Sample<N>, log: bool) -> Option<Synt
         }
         SkeletonTree::gen(size)
             .into_iter()
+            // .find_map(|skeleton| skeleton.gen_formulae::<N>().into_iter().find(|formula| sample.is_consistent(formula)))
             .flat_map(|skeleton| skeleton.gen_formulae::<N>())
             .find(|formula| sample.is_consistent(formula))
     })
 }
 
+// Parallel search is faster but less consistent then single-threaded search
 pub fn par_brute_solve<const N: usize>(sample: &Sample<N>, log: bool) -> Option<SyntaxTree> {
     use rayon::prelude::*;
 
@@ -162,10 +164,12 @@ pub fn par_brute_solve<const N: usize>(sample: &Sample<N>, log: bool) -> Option<
         }
 
         SkeletonTree::gen(size)
-            .into_iter()
-            .flat_map(|skeleton| skeleton.gen_formulae::<N>())
-            .par_bridge()
-            .find_any(|formula| sample.is_consistent(formula))
+            .into_par_iter()
+            .find_map_any(|skeleton| skeleton.gen_formulae::<N>().into_iter().find(|formula| sample.is_consistent(formula)))
+            // .into_iter()
+            // .flat_map(|skeleton| skeleton.gen_formulae::<N>())
+            // .par_bridge()
+            // .find_any(|formula| sample.is_consistent(formula))
     })
 }
 
@@ -228,14 +232,14 @@ fn check_and(left_child: &SyntaxTree, right_child: &SyntaxTree) -> bool {
         | (SyntaxTree::Unary { op: UnaryOp::Globally, .. }, SyntaxTree::Unary { op: UnaryOp::Globally, .. }) => false,
         // (φ -> ψ_1) ∧ (φ -> ψ_2) ≡ φ -> (ψ_1 ∧ ψ_2)
         // (φ_1 -> ψ) ∧ (φ_2 -> ψ) ≡ (φ_1 ∨ φ_2) -> ψ
-        (SyntaxTree::Binary { op: BinaryOp::Implies, left_child: l_1, right_child: r_1 }, SyntaxTree::Binary { op: BinaryOp::Implies, left_child: l_2, right_child: r_2 }) if *l_1 == *l_2 || *r_1 == *r_2 => false,
+        (SyntaxTree::Binary { op: BinaryOp::Implies, left_child: l_1, right_child: r_1 }, SyntaxTree::Binary { op: BinaryOp::Implies, left_child: l_2, right_child: r_2 }) if l_1 == l_2 || r_1 == r_2 => false,
         // (φ_1 U ψ) ∧ (φ_2 U ψ) ≡ (φ_1 ∧ φ_2) U ψleft_child: l_1
-        (SyntaxTree::Binary { op: BinaryOp::Until, right_child: r_1, .. }, SyntaxTree::Binary { op: BinaryOp::Until, right_child: r_2, .. }) if *r_1 == *r_2 => false,
+        (SyntaxTree::Binary { op: BinaryOp::Until, right_child: r_1, .. }, SyntaxTree::Binary { op: BinaryOp::Until, right_child: r_2, .. }) if r_1 == r_2 => false,
         // Absorption laws
-        (SyntaxTree::Binary { op: BinaryOp::Or, left_child: l_1, right_child: r_1 }, right_child) if *(l_1.as_ref()) == *right_child || *(r_1.as_ref()) == *right_child => false,
-        (left_child, SyntaxTree::Binary { op: BinaryOp::Or, left_child: l_1, right_child: r_1 }) if *(l_1.as_ref()) == *left_child || *(r_1.as_ref()) == *left_child => false,
+        (SyntaxTree::Binary { op: BinaryOp::Or, left_child: l_1, right_child: r_1 }, right_child) if l_1.as_ref() == right_child || r_1.as_ref() == right_child => false,
+        (left_child, SyntaxTree::Binary { op: BinaryOp::Or, left_child: l_1, right_child: r_1 }) if l_1.as_ref() == left_child || r_1.as_ref() == left_child => false,
         // Distributive laws
-        (SyntaxTree::Binary { op: BinaryOp::Or, left_child: l_1, right_child: r_1 }, SyntaxTree::Binary { op: BinaryOp::Or, left_child: l_2, right_child: r_2 }) if *l_1 == *l_2 || *l_1 == *r_2 || *r_1 == *l_2 || *r_1 == *r_2 => false,
+        (SyntaxTree::Binary { op: BinaryOp::Or, left_child: l_1, right_child: r_1 }, SyntaxTree::Binary { op: BinaryOp::Or, left_child: l_2, right_child: r_2 }) if l_1 == l_2 || l_1 == r_2 || r_1 == l_2 || r_1 == r_2 => false,
         // G φ ≡ φ ∧ X(G φ)
         (
             left_child,
