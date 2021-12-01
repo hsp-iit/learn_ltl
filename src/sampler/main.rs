@@ -6,36 +6,36 @@ use std::sync::Arc;
 
 fn main() {
     // G(&(x0,->(!(x1),U(!(x1),&(x2,!(x1))))))
-    let not_x1 = Arc::new(SyntaxTree::Unary {
-        op: UnaryOp::Not,
-        child: Arc::new(SyntaxTree::Zeroary {
-            op: ZeroaryOp::AtomicProp(1),
-        }),
-    });
-    let formula = SyntaxTree::Unary {
-        op: UnaryOp::Globally,
-        child: Arc::new(SyntaxTree::Binary {
-            op: BinaryOp::And,
-            left_child: Arc::new(SyntaxTree::Zeroary {
-                op: ZeroaryOp::AtomicProp(0),
-            }),
-            right_child: Arc::new(SyntaxTree::Binary {
-                op: BinaryOp::Implies,
-                left_child: not_x1.clone(),
-                right_child: Arc::new(SyntaxTree::Binary {
-                    op: BinaryOp::Until,
-                    left_child: not_x1.clone(),
-                    right_child: Arc::new(SyntaxTree::Binary {
-                        op: BinaryOp::And,
-                        left_child: Arc::new(SyntaxTree::Zeroary {
-                            op: ZeroaryOp::AtomicProp(2),
-                        }),
-                        right_child: not_x1,
-                    }),
-                }),
-            }),
-        }),
-    };
+    // let not_x1 = Arc::new(SyntaxTree::Unary {
+    //     op: UnaryOp::Not,
+    //     child: Arc::new(SyntaxTree::Zeroary {
+    //         op: ZeroaryOp::AtomicProp(1),
+    //     }),
+    // });
+    // let formula = SyntaxTree::Unary {
+    //     op: UnaryOp::Globally,
+    //     child: Arc::new(SyntaxTree::Binary {
+    //         op: BinaryOp::And,
+    //         left_child: Arc::new(SyntaxTree::Zeroary {
+    //             op: ZeroaryOp::AtomicProp(0),
+    //         }),
+    //         right_child: Arc::new(SyntaxTree::Binary {
+    //             op: BinaryOp::Implies,
+    //             left_child: not_x1.clone(),
+    //             right_child: Arc::new(SyntaxTree::Binary {
+    //                 op: BinaryOp::Until,
+    //                 left_child: not_x1.clone(),
+    //                 right_child: Arc::new(SyntaxTree::Binary {
+    //                     op: BinaryOp::And,
+    //                     left_child: Arc::new(SyntaxTree::Zeroary {
+    //                         op: ZeroaryOp::AtomicProp(2),
+    //                     }),
+    //                     right_child: not_x1,
+    //                 }),
+    //             }),
+    //         }),
+    //     }),
+    // };
 
     // let formula = SyntaxTree::Binary {
     //     op: BinaryOp::Or,
@@ -73,15 +73,17 @@ fn main() {
     //         op: ZeroaryOp::AtomicProp(1)
     //     }),
     // };
-    // let formula = SyntaxTree::Binary {
-    //     op: BinaryOp::Implies,
-    //     left_child: Arc::new(SyntaxTree::Zeroary {
-    //         op: ZeroaryOp::AtomicProp(0)
-    //     }),
-    //     right_child: Arc::new(SyntaxTree::Zeroary {
-    //         op: ZeroaryOp::AtomicProp(1)
-    //     }),
-    // };
+    let formula = SyntaxTree::Binary {
+        op: BinaryOp::Implies,
+        children: Arc::new((
+            SyntaxTree::Zeroary {
+                op: ZeroaryOp::AtomicProp(0)
+            },
+            SyntaxTree::Zeroary {
+                op: ZeroaryOp::AtomicProp(1)
+            }
+        )),
+    };
     let sample = sample::<3>(&formula, 697, 1698 - 698, 10);
     assert!(sample.is_consistent(&formula));
     let name = format!("sample_{}.ron", formula);

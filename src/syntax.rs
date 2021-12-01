@@ -84,8 +84,7 @@ pub enum SyntaxTree {
     },
     Binary {
         op: BinaryOp,
-        left_child: Arc<SyntaxTree>,
-        right_child: Arc<SyntaxTree>,
+        children: Arc<(SyntaxTree, SyntaxTree)>,
     },
 }
 
@@ -96,9 +95,8 @@ impl fmt::Display for SyntaxTree {
             SyntaxTree::Unary { op, child } => write!(f, "{}({})", op, child),
             SyntaxTree::Binary {
                 op,
-                left_child,
-                right_child,
-            } => write!(f, "({}){}({})", left_child, op, right_child),
+                children,
+            } => write!(f, "({}){}({})", children.0, op, children.1),
         }
     }
 }
@@ -137,18 +135,17 @@ impl SyntaxTree {
             },
             SyntaxTree::Binary {
                 op,
-                left_child,
-                right_child,
+                children,
             } => match *op {
-                BinaryOp::And => left_child.eval(trace) && right_child.eval(trace),
-                BinaryOp::Or => left_child.eval(trace) || right_child.eval(trace),
-                BinaryOp::Implies => !left_child.eval(trace) || right_child.eval(trace),
+                BinaryOp::And => children.0.eval(trace) && children.1.eval(trace),
+                BinaryOp::Or => children.0.eval(trace) || children.1.eval(trace),
+                BinaryOp::Implies => !children.0.eval(trace) || children.1.eval(trace),
                 BinaryOp::Until => {
                     for t in 0..trace.len() {
                         let t_trace = &trace[t..];
-                        if right_child.eval(t_trace) {
+                        if children.1.eval(t_trace) {
                             return true;
-                        } else if !left_child.eval(t_trace) {
+                        } else if !children.0.eval(t_trace) {
                             return false;
                         }
                     }
@@ -157,28 +154,28 @@ impl SyntaxTree {
                 // BinaryOp::Release => {
                 //     // TODO: it's probably possible to optimize this
                 //     let release = (0..trace.len())
-                //         .find(|t| left_child.eval(&trace[*t..]))
+                //         .find(|t| children.0.eval(&trace[*t..]))
                 //         .unwrap_or(trace.len());
-                //     (0..=release).all(|t| right_child.eval(&trace[t..]))
+                //     (0..=release).all(|t| children.1.eval(&trace[t..]))
                 // }
                 // BinaryOp::ReleaseLeq(time) => {
                 //     let release = (0..=time as usize)
-                //         .find(|t| left_child.eval(&trace[(*t).min(trace.len())..]))
+                //         .find(|t| children.0.eval(&trace[(*t).min(trace.len())..]))
                 //         .unwrap_or(time as usize);
-                //     (0..=release).all(|t| right_child.eval(&trace[t.min(trace.len())..]))
+                //     (0..=release).all(|t| children.1.eval(&trace[t.min(trace.len())..]))
                 // }
                 // BinaryOp::ReleaseGneq(time) => {
                 //     let release = (time as usize + 1..trace.len())
-                //         .find(|t| left_child.eval(&trace[(*t).min(trace.len())..]))
+                //         .find(|t| children.0.eval(&trace[(*t).min(trace.len())..]))
                 //         .unwrap_or(trace.len());
                 //     (time as usize + 1..=release)
-                //         .all(|t| right_child.eval(&trace[t.min(trace.len())..]))
+                //         .all(|t| children.1.eval(&trace[t.min(trace.len())..]))
                 // }
                 // BinaryOp::UntillLeq(time) => {
                 //     let until = (0..=time as usize)
-                //         .find(|t| right_child.eval(&trace[(*t).min(trace.len())..]))
+                //         .find(|t| children.1.eval(&trace[(*t).min(trace.len())..]))
                 //         .unwrap_or(time as usize + 1);
-                //     (0..until).all(|t| left_child.eval(&trace[t.min(trace.len())..]))
+                //     (0..until).all(|t| children.0.eval(&trace[t.min(trace.len())..]))
                 // }
             },
         }
@@ -304,8 +301,7 @@ mod eval {
     fn and() {
         let formula = SyntaxTree::Binary {
             op: BinaryOp::And,
-            left_child: Arc::new(ATOM_0),
-            right_child: Arc::new(ATOM_1),
+            children: Arc::new((ATOM_0, ATOM_1)),
         };
 
         let trace = [[true, true]];
@@ -318,9 +314,8 @@ mod eval {
     #[test]
     fn or() {
         let formula = SyntaxTree::Binary {
-            op: BinaryOp::Or,
-            left_child: Arc::new(ATOM_0),
-            right_child: Arc::new(ATOM_1),
+            op: BinaryOp::And,
+            children: Arc::new((ATOM_0, ATOM_1)),
         };
 
         let trace = [[true, false]];
@@ -333,9 +328,8 @@ mod eval {
     #[test]
     fn until() {
         let formula = SyntaxTree::Binary {
-            op: BinaryOp::Until,
-            left_child: Arc::new(ATOM_0),
-            right_child: Arc::new(ATOM_1),
+            op: BinaryOp::And,
+            children: Arc::new((ATOM_0, ATOM_1)),
         };
 
         let trace = [[true, false], [false, true], [false, false]];
@@ -349,8 +343,8 @@ mod eval {
     // fn release() {
     //     let formula = SyntaxTree::Binary {
     //         op: BinaryOp::Release,
-    //         left_child: Arc::new(ATOM_0),
-    //         right_child: Arc::new(ATOM_1),
+    //         children.0: Arc::new(ATOM_0),
+    //         children.1: Arc::new(ATOM_1),
     //     };
 
     //     let trace = [[false, true], [true, true], [false, false]];
@@ -364,8 +358,8 @@ mod eval {
     // fn release_leq() {
     //     let formula = SyntaxTree::Binary {
     //         op: BinaryOp::ReleaseLeq(1),
-    //         left_child: Arc::new(ATOM_0),
-    //         right_child: Arc::new(ATOM_1),
+    //         children.0: Arc::new(ATOM_0),
+    //         children.1: Arc::new(ATOM_1),
     //     };
 
     //     let trace = [[false, true], [false, true], [false, false]];
@@ -379,8 +373,8 @@ mod eval {
     // fn release_gneq() {
     //     let formula = SyntaxTree::Binary {
     //         op: BinaryOp::ReleaseGneq(0),
-    //         left_child: Arc::new(ATOM_0),
-    //         right_child: Arc::new(ATOM_1),
+    //         children.0: Arc::new(ATOM_0),
+    //         children.1: Arc::new(ATOM_1),
     //     };
 
     //     let trace = [[false, false], [false, true], [true, true], [false, false]];
@@ -394,8 +388,8 @@ mod eval {
     // fn until_leq() {
     //     let formula = SyntaxTree::Binary {
     //         op: BinaryOp::UntillLeq(1),
-    //         left_child: Arc::new(ATOM_0),
-    //         right_child: Arc::new(ATOM_1),
+    //         children.0: Arc::new(ATOM_0),
+    //         children.1: Arc::new(ATOM_1),
     //     };
 
     //     let trace = [[true, false], [false, true], [false, false]];
