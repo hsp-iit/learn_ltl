@@ -164,23 +164,31 @@ pub fn par_brute_solve<const N: usize>(sample: &Sample<N>, log: bool) -> Option<
         }
 
         SkeletonTree::gen(size)
-            .into_par_iter()
-            .find_map_any(|skeleton| skeleton.gen_formulae::<N>().into_iter().find(|formula| sample.is_consistent(formula)))
-            // .into_iter()
-            // .flat_map(|skeleton| skeleton.gen_formulae::<N>())
-            // .par_bridge()
-            // .find_any(|formula| sample.is_consistent(formula))
+            // .into_par_iter()
+            // .find_map_any(|skeleton| skeleton.gen_formulae::<N>().into_iter().find(|formula| sample.is_consistent(formula)))
+            .into_iter()
+            .flat_map(|skeleton| skeleton.gen_formulae::<N>())
+            .par_bridge()
+            .find_any(|formula| sample.is_consistent(formula))
     })
 }
 
 fn check_not(child: &SyntaxTree) -> bool {
-    !matches!(
-        child,
+    match child {
         // ¬¬φ ≡ φ
         SyntaxTree::Unary { op: UnaryOp::Not, .. }
         // ¬(φ -> ψ) ≡ φ ∧ ¬ψ
-        | SyntaxTree::Binary { op: BinaryOp::Implies, .. }
-    )
+        | SyntaxTree::Binary { op: BinaryOp::Implies, .. } => false,
+        // ¬(¬φ ∨ ψ) ≡ φ ∧ ¬ψ
+        SyntaxTree::Binary { op: BinaryOp::Or, left_child, .. }
+        // ¬(¬φ ∧ ψ) ≡ φ ∨ ¬ψ
+        | SyntaxTree::Binary { op: BinaryOp::And, left_child, .. } if matches!(left_child.as_ref(), SyntaxTree::Unary { op: UnaryOp::Not, .. }) => false,
+        // ¬(φ ∨ ¬ψ) ≡ ¬φ ∧ ψ
+        SyntaxTree::Binary { op: BinaryOp::Or, right_child, .. }
+        // ¬(φ ∧ ¬ψ) ≡ ¬φ ∨ ψ
+        | SyntaxTree::Binary { op: BinaryOp::And, right_child, .. } if matches!(right_child.as_ref(), SyntaxTree::Unary { op: UnaryOp::Not, .. }) => false,
+        _ => true,
+    }
 }
 
 fn check_next(child: &SyntaxTree) -> bool {
@@ -198,6 +206,8 @@ fn check_globally(child: &SyntaxTree) -> bool {
         child,
         // G G φ <=> G φ
         SyntaxTree::Unary { op: UnaryOp::Globally, .. }
+        // X G φ ≡ G X φ
+        | SyntaxTree::Unary { op: UnaryOp::Next, .. }
         // ¬ F φ ≡ G ¬ φ
         | SyntaxTree::Unary { op: UnaryOp::Finally, .. }
         // G False ≡ False
@@ -210,6 +220,8 @@ fn check_finally(child: &SyntaxTree) -> bool {
         child,
         // F F φ <=> F φ
         SyntaxTree::Unary { op: UnaryOp::Finally, .. }
+        // X F φ ≡ F X φ
+        | SyntaxTree::Unary { op: UnaryOp::Globally, .. }
         // F False ≡ False
         | SyntaxTree::Zeroary { op: ZeroaryOp::False }
     )
@@ -219,6 +231,9 @@ fn check_and(left_child: &SyntaxTree, right_child: &SyntaxTree) -> bool {
     // Commutative law
     left_child < right_child
         && match (left_child, right_child) {
+        //  Excluded middle
+        (child, SyntaxTree::Unary { op: UnaryOp::Not, child: neg_child })
+        |(SyntaxTree::Unary { op: UnaryOp::Not, child: neg_child }, child) if child == neg_child.as_ref() => false,
         // Domination law
         (.., SyntaxTree::Zeroary { op: ZeroaryOp::False })
         | (SyntaxTree::Zeroary { op: ZeroaryOp::False }, ..)
@@ -272,6 +287,9 @@ fn check_or(left_child: &SyntaxTree, right_child: &SyntaxTree) -> bool {
     // Commutative law
     left_child < right_child
         && match (left_child, right_child) {
+        //  Excluded middle
+        (child, SyntaxTree::Unary { op: UnaryOp::Not, child: neg_child })
+        |(SyntaxTree::Unary { op: UnaryOp::Not, child: neg_child }, child) if child == neg_child.as_ref() => false,
         // Identity law
         (.., SyntaxTree::Zeroary { op: ZeroaryOp::False })
         | (SyntaxTree::Zeroary { op: ZeroaryOp::False }, ..)

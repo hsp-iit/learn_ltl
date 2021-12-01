@@ -31,17 +31,17 @@ pub fn load_and_solve(contents: Vec<u8>) -> Option<SyntaxTree> {
     (1..=5).into_iter().find_map(|n| {
         match n {
             0 => ron::de::from_bytes::<Sample<0>>(&contents)
-                .map(|sample| par_brute_solve(&sample, true)),
+                .map(|sample| brute_solve(&sample, true)),
             1 => ron::de::from_bytes::<Sample<1>>(&contents)
-                .map(|sample| par_brute_solve(&sample, true)),
+                .map(|sample| brute_solve(&sample, true)),
             2 => ron::de::from_bytes::<Sample<2>>(&contents)
-                .map(|sample| par_brute_solve(&sample, true)),
+                .map(|sample| brute_solve(&sample, true)),
             3 => ron::de::from_bytes::<Sample<3>>(&contents)
-                .map(|sample| par_brute_solve(&sample, true)),
+                .map(|sample| brute_solve(&sample, true)),
             4 => ron::de::from_bytes::<Sample<4>>(&contents)
-                .map(|sample| par_brute_solve(&sample, true)),
+                .map(|sample| brute_solve(&sample, true)),
             5 => ron::de::from_bytes::<Sample<5>>(&contents)
-                .map(|sample| par_brute_solve(&sample, true)),
+                .map(|sample| brute_solve(&sample, true)),
             _ => panic!("out-of-bound parameter"),
         }
         .ok()

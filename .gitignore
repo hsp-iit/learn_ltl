@@ -1,3 +1,7 @@
 /target
 *.lock
 sample_*
+*.svg
+*.data
+*.old
+*.folded

@@ -148,9 +148,7 @@ impl SyntaxTree {
                         let t_trace = &trace[t..];
                         if right_child.eval(t_trace) {
                             return true;
-                        } else if left_child.eval(t_trace) {
-                            continue;
-                        } else {
+                        } else if !left_child.eval(t_trace) {
                             return false;
                         }
                     }
