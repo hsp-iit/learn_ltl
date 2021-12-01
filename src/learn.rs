@@ -3,7 +3,7 @@
 use crate::syntax::*;
 use crate::trace::*;
 use itertools::Itertools;
-use std::rc::Rc;
+
 use std::sync::Arc;
 
 // pub fn learn<const N: usize>(sample: Sample<N>) -> Option<SyntaxTree> {
