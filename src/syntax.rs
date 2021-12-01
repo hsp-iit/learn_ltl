@@ -1,11 +1,14 @@
-use crate::trace::*;
 use std::{fmt, sync::Arc};
 
+// use std::num::NonZeroU8;
+// pub type ZeroaryOp = Option<NonZeroU8>;
+
 pub type Time = u8;
+pub type Var = u8;
 
 #[derive(Debug, Clone, Copy, PartialOrd, Ord, PartialEq, Eq)]
 pub enum ZeroaryOp {
-    AtomicProp(usize),
+    AtomicProp(Var),
     False,
 }
 
@@ -107,7 +110,7 @@ impl SyntaxTree {
                 ZeroaryOp::False => false,
                 ZeroaryOp::AtomicProp(atomic_prop) => trace
                     .first()
-                    .and_then(|vals| vals.get(*atomic_prop))
+                    .and_then(|vals| vals.get(*atomic_prop as usize))
                     .cloned()
                     .unwrap_or(false),
             },
@@ -121,15 +124,16 @@ impl SyntaxTree {
                     }
                 }
                 UnaryOp::Globally => (0..trace.len()).all(|t| child.eval(&trace[t..])),
-                UnaryOp::Finally => (0..trace.len()).any(|t| child.eval(&trace[t..])), // UnaryOp::GloballyLeq(time) => {
-                                                                                       //     (0..(time as usize + 1).min(trace.len())).all(|t| child.eval(&trace[t..]))
-                                                                                       // }
-                                                                                       // UnaryOp::GloballyGneq(time) => {
-                                                                                       //     (time as usize + 1..trace.len()).all(|t| child.eval(&trace[t..]))
-                                                                                       // }
-                                                                                       // UnaryOp::FinallyLeq(time) => {
-                                                                                       //     (0..(time as usize + 1).min(trace.len())).any(|t| child.eval(&trace[t..]))
-                                                                                       // }
+                UnaryOp::Finally => (0..trace.len()).any(|t| child.eval(&trace[t..])),
+                // UnaryOp::GloballyLeq(time) => {
+                    //     (0..(time as usize + 1).min(trace.len())).all(|t| child.eval(&trace[t..]))
+                    // }
+                    // UnaryOp::GloballyGneq(time) => {
+                    //     (time as usize + 1..trace.len()).all(|t| child.eval(&trace[t..]))
+                    // }
+                    // UnaryOp::FinallyLeq(time) => {
+                    //     (0..(time as usize + 1).min(trace.len())).any(|t| child.eval(&trace[t..]))
+                // }
             },
             SyntaxTree::Binary {
                 op,
@@ -144,32 +148,33 @@ impl SyntaxTree {
                         .find(|t| right_child.eval(&trace[*t..]))
                         .unwrap_or(trace.len() as usize);
                     (0..until).all(|t| left_child.eval(&trace[t..]))
-                } // BinaryOp::Release => {
-                  //     // TODO: it's probably possible to optimize this
-                  //     let release = (0..trace.len())
-                  //         .find(|t| left_child.eval(&trace[*t..]))
-                  //         .unwrap_or(trace.len());
-                  //     (0..=release).all(|t| right_child.eval(&trace[t..]))
-                  // }
-                  // BinaryOp::ReleaseLeq(time) => {
-                  //     let release = (0..=time as usize)
-                  //         .find(|t| left_child.eval(&trace[(*t).min(trace.len())..]))
-                  //         .unwrap_or(time as usize);
-                  //     (0..=release).all(|t| right_child.eval(&trace[t.min(trace.len())..]))
-                  // }
-                  // BinaryOp::ReleaseGneq(time) => {
-                  //     let release = (time as usize + 1..trace.len())
-                  //         .find(|t| left_child.eval(&trace[(*t).min(trace.len())..]))
-                  //         .unwrap_or(trace.len());
-                  //     (time as usize + 1..=release)
-                  //         .all(|t| right_child.eval(&trace[t.min(trace.len())..]))
-                  // }
-                  // BinaryOp::UntillLeq(time) => {
-                  //     let until = (0..=time as usize)
-                  //         .find(|t| right_child.eval(&trace[(*t).min(trace.len())..]))
-                  //         .unwrap_or(time as usize + 1);
-                  //     (0..until).all(|t| left_child.eval(&trace[t.min(trace.len())..]))
-                  // }
+                },
+                // BinaryOp::Release => {
+                //     // TODO: it's probably possible to optimize this
+                //     let release = (0..trace.len())
+                //         .find(|t| left_child.eval(&trace[*t..]))
+                //         .unwrap_or(trace.len());
+                //     (0..=release).all(|t| right_child.eval(&trace[t..]))
+                // }
+                // BinaryOp::ReleaseLeq(time) => {
+                //     let release = (0..=time as usize)
+                //         .find(|t| left_child.eval(&trace[(*t).min(trace.len())..]))
+                //         .unwrap_or(time as usize);
+                //     (0..=release).all(|t| right_child.eval(&trace[t.min(trace.len())..]))
+                // }
+                // BinaryOp::ReleaseGneq(time) => {
+                //     let release = (time as usize + 1..trace.len())
+                //         .find(|t| left_child.eval(&trace[(*t).min(trace.len())..]))
+                //         .unwrap_or(trace.len());
+                //     (time as usize + 1..=release)
+                //         .all(|t| right_child.eval(&trace[t.min(trace.len())..]))
+                // }
+                // BinaryOp::UntillLeq(time) => {
+                //     let until = (0..=time as usize)
+                //         .find(|t| right_child.eval(&trace[(*t).min(trace.len())..]))
+                //         .unwrap_or(time as usize + 1);
+                //     (0..until).all(|t| left_child.eval(&trace[t.min(trace.len())..]))
+                // }
             },
         }
     }

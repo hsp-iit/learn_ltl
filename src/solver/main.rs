@@ -3,6 +3,8 @@ use learn_pltl_fast::*;
 use std::fs::File;
 use std::io::prelude::*;
 use std::io::BufReader;
+use std::rc::Rc;
+use std::sync::Arc;
 
 // mod too_big_to_handle;
 
@@ -16,7 +18,7 @@ fn main() -> std::io::Result<()> {
     buf_reader.read_to_end(&mut contents)?;
 
     if let Some(solution) = load_and_solve(contents) {
-        // if let Some(solution) = par_brute_solve::<3>(&one_three_0077(), true) {
+        // if let Some(solution) = par_mmztn_solve::<3>(&one_three_0077(), true) {
         println!("Solution: {}", solution);
     } else {
         println!("No solution found");
@@ -48,105 +50,105 @@ pub fn load_and_solve(contents: Vec<u8>) -> Option<SyntaxTree> {
             .ok()
             .flatten()
         })
-        .map(|arc| (*arc).clone())
+        // .map(|arc| (*arc).clone())
 }
 
-#[cfg(test)]
-mod satisfy {
-    use std::sync::Arc;
+// #[cfg(test)]
+// mod satisfy {
+//     use std::sync::Arc;
 
-    use super::*;
+//     use super::*;
 
-    #[test]
-    fn sample_0077() {
-        let file = File::open("sample_0077.ron").expect("open file");
-        let mut buf_reader = BufReader::new(file);
-        let mut contents = Vec::new();
-        buf_reader.read_to_end(&mut contents).expect("read content");
+//     #[test]
+//     fn sample_0077() {
+//         let file = File::open("sample_0077.ron").expect("open file");
+//         let mut buf_reader = BufReader::new(file);
+//         let mut contents = Vec::new();
+//         buf_reader.read_to_end(&mut contents).expect("read content");
 
-        let sample = ron::de::from_bytes::<Sample<3>>(&contents).expect("sample");
-        let solution = SyntaxTree::Binary {
-            op: BinaryOp::Or,
-            left_child: Arc::new(SyntaxTree::Unary {
-                op: UnaryOp::Globally,
-                child: Arc::new(SyntaxTree::Unary {
-                    op: UnaryOp::Not,
-                    child: Arc::new(SyntaxTree::Zeroary {
-                        op: ZeroaryOp::AtomicProp(0),
-                    }),
-                }),
-            }),
-            right_child: Arc::new(SyntaxTree::Unary {
-                op: UnaryOp::Finally,
-                child: Arc::new(SyntaxTree::Binary {
-                    op: BinaryOp::And,
-                    left_child: Arc::new(SyntaxTree::Zeroary {
-                        op: ZeroaryOp::AtomicProp(0),
-                    }),
-                    right_child: Arc::new(SyntaxTree::Unary {
-                        op: UnaryOp::Finally,
-                        child: Arc::new(SyntaxTree::Zeroary {
-                            op: ZeroaryOp::AtomicProp(1),
-                        }),
-                    }),
-                }),
-            }),
-        };
-        assert!(sample.is_consistent(&solution));
-    }
+//         let sample = ron::de::from_bytes::<Sample<3>>(&contents).expect("sample");
+//         let solution = SyntaxTree::Binary {
+//             op: BinaryOp::Or,
+//             left_child: Arc::new(SyntaxTree::Unary {
+//                 op: UnaryOp::Globally,
+//                 child: Arc::new(SyntaxTree::Unary {
+//                     op: UnaryOp::Not,
+//                     child: Arc::new(SyntaxTree::Zeroary {
+//                         op: ZeroaryOp::AtomicProp(0),
+//                     }),
+//                 }),
+//             }),
+//             right_child: Arc::new(SyntaxTree::Unary {
+//                 op: UnaryOp::Finally,
+//                 child: Arc::new(SyntaxTree::Binary {
+//                     op: BinaryOp::And,
+//                     left_child: Arc::new(SyntaxTree::Zeroary {
+//                         op: ZeroaryOp::AtomicProp(0),
+//                     }),
+//                     right_child: Arc::new(SyntaxTree::Unary {
+//                         op: UnaryOp::Finally,
+//                         child: Arc::new(SyntaxTree::Zeroary {
+//                             op: ZeroaryOp::AtomicProp(1),
+//                         }),
+//                     }),
+//                 }),
+//             }),
+//         };
+//         assert!(sample.is_consistent(&solution));
+//     }
 
-    // #[test]
-    // fn tbth01() {
-    //     let file = File::open("sample_tbth01.ron").expect("open file");
-    //     let mut buf_reader = BufReader::new(file);
-    //     let mut contents = Vec::new();
-    //     buf_reader.read_to_end(&mut contents).expect("read content");
+//     // #[test]
+//     // fn tbth01() {
+//     //     let file = File::open("sample_tbth01.ron").expect("open file");
+//     //     let mut buf_reader = BufReader::new(file);
+//     //     let mut contents = Vec::new();
+//     //     buf_reader.read_to_end(&mut contents).expect("read content");
 
-    //     let de_sample = ron::de::from_bytes::<DeSample<3>>(&contents).expect("sample");
-    //     let sample = de_sample.into_sample();
-    //     let solution = SyntaxTree::Binary {
-    //         op: BinaryOp::Or,
-    //         left_child: Arc::new(
-    //             SyntaxTree::Unary {
-    //                 op: UnaryOp::Globally,
-    //                 child: Arc::new(
-    //                     SyntaxTree::Unary {
-    //                         op: UnaryOp::Not,
-    //                         child: Arc::new(
-    //                             SyntaxTree::Zeroary {
-    //                                 op: ZeroaryOp::AtomicProp(0)
-    //                             }
-    //                         )
-    //                     }
-    //                 )
-    //             }
-    //         ),
-    //         right_child: Arc::new(
-    //             SyntaxTree::Unary {
-    //                 op: UnaryOp::Finally,
-    //                 child: Arc::new(
-    //                     SyntaxTree::Binary {
-    //                         op: BinaryOp::And,
-    //                         left_child: Arc::new(
-    //                             SyntaxTree::Zeroary {
-    //                                 op: ZeroaryOp::AtomicProp(0)
-    //                             }
-    //                         ),
-    //                         right_child: Arc::new(
-    //                             SyntaxTree::Unary {
-    //                                 op: UnaryOp::Finally,
-    //                                 child: Arc::new(
-    //                                     SyntaxTree::Zeroary {
-    //                                         op: ZeroaryOp::AtomicProp(1)
-    //                                     }
-    //                                 )
-    //                             }
-    //                         )
-    //                     }
-    //                 )
-    //             }
-    //         )
-    //     };
-    //     assert!(sample.is_consistent(&solution));
-    // }
-}
+//     //     let de_sample = ron::de::from_bytes::<DeSample<3>>(&contents).expect("sample");
+//     //     let sample = de_sample.into_sample();
+//     //     let solution = SyntaxTree::Binary {
+//     //         op: BinaryOp::Or,
+//     //         left_child: Arc::new(
+//     //             SyntaxTree::Unary {
+//     //                 op: UnaryOp::Globally,
+//     //                 child: Arc::new(
+//     //                     SyntaxTree::Unary {
+//     //                         op: UnaryOp::Not,
+//     //                         child: Arc::new(
+//     //                             SyntaxTree::Zeroary {
+//     //                                 op: ZeroaryOp::AtomicProp(0)
+//     //                             }
+//     //                         )
+//     //                     }
+//     //                 )
+//     //             }
+//     //         ),
+//     //         right_child: Arc::new(
+//     //             SyntaxTree::Unary {
+//     //                 op: UnaryOp::Finally,
+//     //                 child: Arc::new(
+//     //                     SyntaxTree::Binary {
+//     //                         op: BinaryOp::And,
+//     //                         left_child: Arc::new(
+//     //                             SyntaxTree::Zeroary {
+//     //                                 op: ZeroaryOp::AtomicProp(0)
+//     //                             }
+//     //                         ),
+//     //                         right_child: Arc::new(
+//     //                             SyntaxTree::Unary {
+//     //                                 op: UnaryOp::Finally,
+//     //                                 child: Arc::new(
+//     //                                     SyntaxTree::Zeroary {
+//     //                                         op: ZeroaryOp::AtomicProp(1)
+//     //                                     }
+//     //                                 )
+//     //                             }
+//     //                         )
+//     //                     }
+//     //                 )
+//     //             }
+//     //         )
+//     //     };
+//     //     assert!(sample.is_consistent(&solution));
+//     // }
+// }
