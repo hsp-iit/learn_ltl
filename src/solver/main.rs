@@ -4,8 +4,6 @@ use std::fs::File;
 use std::io::prelude::*;
 use std::io::BufReader;
 
-
-
 // mod too_big_to_handle;
 
 fn main() -> std::io::Result<()> {
@@ -13,6 +11,7 @@ fn main() -> std::io::Result<()> {
     // let file = File::open("sample_0077.ron")?;
     // let file = File::open("sample197.ron")?;
     let file = File::open("sample_tbth01.ron")?;
+    // let file = File::open("sample_G((x0)∧((¬(x1))→((¬(x1))U((x2)∧(¬(x1)))))).ron")?;
     let mut buf_reader = BufReader::new(file);
     let mut contents = Vec::new();
     buf_reader.read_to_end(&mut contents)?;
@@ -29,28 +28,26 @@ fn main() -> std::io::Result<()> {
 
 pub fn load_and_solve(contents: Vec<u8>) -> Option<SyntaxTree> {
     // Ugly hack to get around limitations of deserialization for types with const generics.
-    (1..=5)
-        .into_iter()
-        .find_map(|n| {
-            match n {
-                0 => ron::de::from_bytes::<Sample<0>>(&contents)
-                    .map(|sample| par_brute_solve(&sample, true)),
-                1 => ron::de::from_bytes::<Sample<1>>(&contents)
-                    .map(|sample| par_brute_solve(&sample, true)),
-                2 => ron::de::from_bytes::<Sample<2>>(&contents)
-                    .map(|sample| par_brute_solve(&sample, true)),
-                3 => ron::de::from_bytes::<Sample<3>>(&contents)
-                    .map(|sample| par_brute_solve(&sample, true)),
-                4 => ron::de::from_bytes::<Sample<4>>(&contents)
-                    .map(|sample| par_brute_solve(&sample, true)),
-                5 => ron::de::from_bytes::<Sample<5>>(&contents)
-                    .map(|sample| par_brute_solve(&sample, true)),
-                _ => panic!("out-of-bound parameter"),
-            }
-            .ok()
-            .flatten()
-        })
-        // .map(|arc| (*arc).clone())
+    (1..=5).into_iter().find_map(|n| {
+        match n {
+            0 => ron::de::from_bytes::<Sample<0>>(&contents)
+                .map(|sample| par_brute_solve(&sample, true)),
+            1 => ron::de::from_bytes::<Sample<1>>(&contents)
+                .map(|sample| par_brute_solve(&sample, true)),
+            2 => ron::de::from_bytes::<Sample<2>>(&contents)
+                .map(|sample| par_brute_solve(&sample, true)),
+            3 => ron::de::from_bytes::<Sample<3>>(&contents)
+                .map(|sample| par_brute_solve(&sample, true)),
+            4 => ron::de::from_bytes::<Sample<4>>(&contents)
+                .map(|sample| par_brute_solve(&sample, true)),
+            5 => ron::de::from_bytes::<Sample<5>>(&contents)
+                .map(|sample| par_brute_solve(&sample, true)),
+            _ => panic!("out-of-bound parameter"),
+        }
+        .ok()
+        .flatten()
+    })
+    // .map(|arc| (*arc).clone())
 }
 
 // #[cfg(test)]

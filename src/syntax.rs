@@ -117,22 +117,22 @@ impl SyntaxTree {
             SyntaxTree::Unary { op, child } => match *op {
                 UnaryOp::Not => !child.eval(trace),
                 UnaryOp::Next => {
-                    if trace.len() > 0 {
-                        child.eval(&trace[1..])
-                    } else {
+                    if trace.is_empty() {
                         false
+                    } else {
+                        child.eval(&trace[1..])
                     }
                 }
                 UnaryOp::Globally => (0..trace.len()).all(|t| child.eval(&trace[t..])),
                 UnaryOp::Finally => (0..trace.len()).any(|t| child.eval(&trace[t..])),
                 // UnaryOp::GloballyLeq(time) => {
-                    //     (0..(time as usize + 1).min(trace.len())).all(|t| child.eval(&trace[t..]))
-                    // }
-                    // UnaryOp::GloballyGneq(time) => {
-                    //     (time as usize + 1..trace.len()).all(|t| child.eval(&trace[t..]))
-                    // }
-                    // UnaryOp::FinallyLeq(time) => {
-                    //     (0..(time as usize + 1).min(trace.len())).any(|t| child.eval(&trace[t..]))
+                //     (0..(time as usize + 1).min(trace.len())).all(|t| child.eval(&trace[t..]))
+                // }
+                // UnaryOp::GloballyGneq(time) => {
+                //     (time as usize + 1..trace.len()).all(|t| child.eval(&trace[t..]))
+                // }
+                // UnaryOp::FinallyLeq(time) => {
+                //     (0..(time as usize + 1).min(trace.len())).any(|t| child.eval(&trace[t..]))
                 // }
             },
             SyntaxTree::Binary {
@@ -144,11 +144,18 @@ impl SyntaxTree {
                 BinaryOp::Or => left_child.eval(trace) || right_child.eval(trace),
                 BinaryOp::Implies => !left_child.eval(trace) || right_child.eval(trace),
                 BinaryOp::Until => {
-                    let until = (0..trace.len())
-                        .find(|t| right_child.eval(&trace[*t..]))
-                        .unwrap_or(trace.len() as usize);
-                    (0..until).all(|t| left_child.eval(&trace[t..]))
-                },
+                    for t in 0..trace.len() {
+                        let t_trace = &trace[t..];
+                        if right_child.eval(t_trace) {
+                            return true;
+                        } else if left_child.eval(t_trace) {
+                            continue;
+                        } else {
+                            return false;
+                        }
+                    }
+                    true
+                }
                 // BinaryOp::Release => {
                 //     // TODO: it's probably possible to optimize this
                 //     let release = (0..trace.len())

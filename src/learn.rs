@@ -6,14 +6,6 @@ use itertools::Itertools;
 
 use std::sync::Arc;
 
-// pub fn learn<const N: usize>(sample: Sample<N>) -> Option<SyntaxTree> {
-//     unimplemented!();
-// }
-
-// pub fn learn_size<const N: usize>(sample: Sample<N>, size: usize) -> Option<SyntaxTree> {
-//     unimplemented!();
-// }
-
 #[derive(Debug, Clone)]
 enum SkeletonTree {
     Zeroary,
@@ -22,14 +14,38 @@ enum SkeletonTree {
 }
 
 impl SkeletonTree {
+    fn gen(size: usize) -> Vec<SkeletonTree> {
+        if size == 0 {
+            vec![SkeletonTree::Zeroary]
+        } else {
+            let smaller_skeletons = Self::gen(size - 1);
+            let mut skeletons: Vec<SkeletonTree> = smaller_skeletons
+                .into_iter()
+                .map(|child| SkeletonTree::Unary(Arc::new(child)))
+                .collect();
+            for left_size in 0..size {
+                let left_smaller_skeletons = Self::gen(left_size);
+                let right_smaller_skeletons = Self::gen(size - 1 - left_size);
+
+                skeletons.extend(
+                    left_smaller_skeletons
+                        .into_iter()
+                        .cartesian_product(right_smaller_skeletons.into_iter())
+                        .map(|(left_child, right_child)| {
+                            SkeletonTree::Binary((Arc::new(left_child), Arc::new(right_child)))
+                        }),
+                );
+            }
+            skeletons
+        }
+    }
+
     fn gen_formulae<const N: usize>(&self) -> Vec<SyntaxTree> {
         match self {
             SkeletonTree::Zeroary => {
                 let mut trees = (0..N)
-                    .map(|n| {
-                        SyntaxTree::Zeroary {
-                            op: ZeroaryOp::AtomicProp(n as Var),
-                        }
+                    .map(|n| SyntaxTree::Zeroary {
+                        op: ZeroaryOp::AtomicProp(n as Var),
                     })
                     .collect::<Vec<SyntaxTree>>();
                 trees.push(SyntaxTree::Zeroary {
@@ -40,10 +56,10 @@ impl SkeletonTree {
             SkeletonTree::Unary(child) => {
                 let mut trees = Vec::new();
                 let children = child.gen_formulae::<N>();
-    
+
                 for child in children {
                     let a_child = Arc::new(child.clone());
-    
+
                     if check_globally(&child) {
                         trees.push(SyntaxTree::Unary {
                             op: UnaryOp::Globally,
@@ -56,14 +72,14 @@ impl SkeletonTree {
                             child: a_child.clone(),
                         });
                     }
-    
+
                     if check_not(&child) {
                         trees.push(SyntaxTree::Unary {
                             op: UnaryOp::Not,
                             child: a_child.clone(),
                         });
                     }
-    
+
                     if check_next(&child) {
                         trees.push(SyntaxTree::Unary {
                             op: UnaryOp::Next,
@@ -71,7 +87,7 @@ impl SkeletonTree {
                         });
                     }
                 }
-    
+
                 trees
             }
             SkeletonTree::Binary(child) => {
@@ -81,11 +97,11 @@ impl SkeletonTree {
                 let children = left_children
                     .into_iter()
                     .cartesian_product(right_children.into_iter());
-    
+
                 for (left_child, right_child) in children {
                     let a_left_child = Arc::new(left_child.clone());
                     let a_right_child = Arc::new(right_child.clone());
-    
+
                     if check_and(&left_child, &right_child) {
                         trees.push(SyntaxTree::Binary {
                             op: BinaryOp::And,
@@ -93,7 +109,7 @@ impl SkeletonTree {
                             right_child: a_right_child.clone(),
                         });
                     }
-    
+
                     if check_or(&left_child, &right_child) {
                         trees.push(SyntaxTree::Binary {
                             op: BinaryOp::Or,
@@ -101,7 +117,7 @@ impl SkeletonTree {
                             right_child: a_right_child.clone(),
                         });
                     }
-    
+
                     if check_implies(&left_child, &right_child) {
                         trees.push(SyntaxTree::Binary {
                             op: BinaryOp::Implies,
@@ -109,7 +125,7 @@ impl SkeletonTree {
                             right_child: a_right_child.clone(),
                         });
                     }
-    
+
                     if check_until(&left_child, &right_child) {
                         trees.push(SyntaxTree::Binary {
                             op: BinaryOp::Until,
@@ -123,17 +139,6 @@ impl SkeletonTree {
             }
         }
     }
-    
-
-    // fn depth(&self) -> u8 {
-    //     match self {
-    //         SkeletonTree::Zeroary => 1,
-    //         SkeletonTree::Unary(child) => child.depth() + 1,
-    //         SkeletonTree::Binary((left_child, right_child)) => {
-    //             left_child.depth().max(right_child.depth()) + 1
-    //         }
-    //     }
-    // }
 }
 
 pub fn brute_solve<const N: usize>(sample: &Sample<N>, log: bool) -> Option<SyntaxTree> {
@@ -141,7 +146,7 @@ pub fn brute_solve<const N: usize>(sample: &Sample<N>, log: bool) -> Option<Synt
         if log {
             println!("Searching formulae of size {}", size);
         }
-        gen_skeleton_trees(size)
+        SkeletonTree::gen(size)
             .into_iter()
             .flat_map(|skeleton| skeleton.gen_formulae::<N>())
             .find(|formula| sample.is_consistent(formula))
@@ -156,42 +161,12 @@ pub fn par_brute_solve<const N: usize>(sample: &Sample<N>, log: bool) -> Option<
             println!("Generating formulae of size {}", size);
         }
 
-        gen_skeleton_trees(size)
+        SkeletonTree::gen(size)
             .into_iter()
             .flat_map(|skeleton| skeleton.gen_formulae::<N>())
             .par_bridge()
             .find_any(|formula| sample.is_consistent(formula))
     })
-}
-
-// Should be possible to compute skeleton trees at compile time
-fn gen_skeleton_trees(size: usize) -> Vec<SkeletonTree> {
-    if size == 0 {
-        vec![SkeletonTree::Zeroary]
-    } else {
-        let smaller_skeletons = gen_skeleton_trees(size - 1);
-        let mut skeletons: Vec<SkeletonTree> = smaller_skeletons
-            .into_iter()
-            .map(|child| SkeletonTree::Unary(Arc::new(child)))
-            .collect();
-        for left_size in 0..size {
-            let left_smaller_skeletons = gen_skeleton_trees(left_size);
-            let right_smaller_skeletons = gen_skeleton_trees(size - 1 - left_size);
-
-            skeletons.extend(
-                left_smaller_skeletons
-                    .into_iter()
-                    .cartesian_product(right_smaller_skeletons.into_iter())
-                    .map(|(left_child, right_child)| {
-                        SkeletonTree::Binary((
-                            Arc::new(left_child),
-                            Arc::new(right_child),
-                        ))
-                    }),
-            );
-        }
-        skeletons
-    }
 }
 
 fn check_not(child: &SyntaxTree) -> bool {
