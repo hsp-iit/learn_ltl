@@ -195,44 +195,45 @@ fn gen_skeleton_trees(size: usize) -> Vec<SkeletonTree> {
 }
 
 fn check_not(child: &SyntaxTree) -> bool {
-    match *child {
+    !matches!(
+        child,
         // ¬¬φ ≡ φ
         SyntaxTree::Unary { op: UnaryOp::Not, .. }
         // ¬(φ -> ψ) ≡ φ ∧ ¬ψ
-        | SyntaxTree::Binary { op: BinaryOp::Implies, .. } => false,
-        _ => true,
-    }
+        | SyntaxTree::Binary { op: BinaryOp::Implies, .. }
+    )
 }
 
 fn check_next(child: &SyntaxTree) -> bool {
-    match *child {
+    !matches!(
+        child,
         // ¬ X φ ≡ X ¬ φ
-        SyntaxTree::Unary {
-            op: UnaryOp::Next, ..
-        } => false,
-        _ => true,
-    }
+        SyntaxTree::Unary { op: UnaryOp::Next, .. }
+        // X False ≡ False
+        | SyntaxTree::Zeroary { op: ZeroaryOp::False }
+    )
 }
 
 fn check_globally(child: &SyntaxTree) -> bool {
-    match *child {
+    !matches!(
+        child,
         // G G φ <=> G φ
         SyntaxTree::Unary { op: UnaryOp::Globally, .. }
         // ¬ F φ ≡ G ¬ φ
-        | SyntaxTree::Unary { op: UnaryOp::Finally, .. } => false,
-        _ => true,
-    }
+        | SyntaxTree::Unary { op: UnaryOp::Finally, .. }
+        // G False ≡ False
+        | SyntaxTree::Zeroary { op: ZeroaryOp::False }
+    )
 }
 
 fn check_finally(child: &SyntaxTree) -> bool {
-    match *child {
+    !matches!(
+        child,
         // F F φ <=> F φ
-        SyntaxTree::Unary {
-            op: UnaryOp::Finally,
-            ..
-        } => false,
-        _ => true,
-    }
+        SyntaxTree::Unary { op: UnaryOp::Finally, .. }
+        // F False ≡ False
+        | SyntaxTree::Zeroary { op: ZeroaryOp::False }
+    )
 }
 
 fn check_and(left_child: &SyntaxTree, right_child: &SyntaxTree) -> bool {
@@ -421,26 +422,45 @@ fn check_or(left_child: &SyntaxTree, right_child: &SyntaxTree) -> bool {
 }
 
 fn check_implies(left_child: &SyntaxTree, right_child: &SyntaxTree) -> bool {
-    match (left_child, right_child) {
-        // Ex falso quodlibet (need to define True)
+    !matches!(
+        (left_child, right_child),
+        // Ex falso quodlibet (True defined as False -> False)
+        (
+            SyntaxTree::Zeroary { op: ZeroaryOp::False },
+            SyntaxTree::Unary { .. } | SyntaxTree::Binary { .. },
+        )
         // (SyntaxTree::Zeroary { op: ZeroaryOp::False, .. }, ..)
-        // // φ -> ψ ≡ ¬ψ -> ¬φ
+        // // φ -> ψ ≡ ¬ψ -> ¬φ // subsumed by following rule
         // (SyntaxTree::Unary { op: UnaryOp::Not, .. }, SyntaxTree::Unary { op: UnaryOp::Not, .. }) => false,
         // ¬φ -> ψ ≡ ψ ∨ φ
-        (
+        | (
             SyntaxTree::Unary {
-                op: UnaryOp::Not, ..
+                op: UnaryOp::Not,
+                ..
             },
             ..,
-        ) => false,
-        _ => true,
-    }
+        )
+    )
 }
 
 fn check_until(left_child: &SyntaxTree, right_child: &SyntaxTree) -> bool {
     match (left_child, right_child) {
-        // X (φ U ψ) ≡ (X φ) U (X ψ)
+        // φ U False ≡ G φ
         (
+            ..,
+            SyntaxTree::Zeroary {
+                op: ZeroaryOp::False
+            },
+        )
+        // False U φ ≡ φ
+        | (
+            SyntaxTree::Zeroary {
+                op: ZeroaryOp::False
+            },
+            ..
+        )
+        // X (φ U ψ) ≡ (X φ) U (X ψ)
+        | (
             SyntaxTree::Unary {
                 op: UnaryOp::Next, ..
             },
@@ -448,6 +468,7 @@ fn check_until(left_child: &SyntaxTree, right_child: &SyntaxTree) -> bool {
                 op: UnaryOp::Next, ..
             },
         ) => false,
+        // φ U ψ ≡ φ U (φ U ψ)
         (
             left_child,
             SyntaxTree::Binary {
