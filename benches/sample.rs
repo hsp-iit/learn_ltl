@@ -1,24 +1,8 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use learn_pltl_fast::*;
-use std::fs::File;
-use std::io::prelude::*;
-use std::io::BufReader;
 
 fn solve_sample(c: &mut Criterion) {
-    // let file = File::open("sample_0197.ron").expect("open sample file");
-    let file = File::open("sample_(G(¬(x0)))∨(F((x0)∧(F(x1)))).ron").expect("open sample file");
-    let mut buf_reader = BufReader::new(file);
-    let mut contents = Vec::new();
-    buf_reader
-        .read_to_end(&mut contents)
-        .expect("read sample file");
-    let sample: Sample<2> = ron::de::from_bytes(&contents).expect("deserialize sample");
-
-    // c.bench_function("solve sample", |b| {
-    //     b.iter(|| par_brute_solve(black_box(&sample), false))
-    // });
-
-    // let sample = one_three_0077();
+    let sample = one_three_0077();
 
     c.bench_function("solve sample 0077", |b| {
         b.iter(|| brute_solve(black_box(&sample), false))
@@ -31,30 +15,6 @@ fn solve_sample(c: &mut Criterion) {
 
 criterion_group!(benches, solve_sample);
 criterion_main!(benches);
-
-// pub fn load_and_solve(contents: Vec<u8>) -> Option<String> {
-//     // Ugly hack to get around limitations of deserialization for types with const generics.
-//     (1..=5)
-//         .into_iter()
-//         .find_map(|n| {
-//             match n {
-//                 1 => ron::de::from_bytes::<Sample<1>>(&contents)
-//                     .map(|sample| par_brute_solve(&sample, true)),
-//                 2 => ron::de::from_bytes::<Sample<2>>(&contents)
-//                     .map(|sample| par_brute_solve(&sample, true)),
-//                 3 => ron::de::from_bytes::<Sample<3>>(&contents)
-//                     .map(|sample| par_brute_solve(&sample, true)),
-//                 4 => ron::de::from_bytes::<Sample<4>>(&contents)
-//                     .map(|sample| par_brute_solve(&sample, true)),
-//                 5 => ron::de::from_bytes::<Sample<5>>(&contents)
-//                     .map(|sample| par_brute_solve(&sample, true)),
-//                 _ => panic!("out-of-bound parameter"),
-//             }
-//             .ok()
-//             .flatten()
-//         })
-//         // .map(|arc| (*arc).clone())
-// }
 
 pub fn one_three_0077() -> Sample<3> {
     Sample {
