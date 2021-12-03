@@ -5,6 +5,15 @@ use std::io::BufWriter;
 use std::sync::Arc;
 
 fn main() {
+    // // G ( ( ( !x_2 ) => ( F x_6 ) ) U (x_2 || x_5) )
+    // let formula = SyntaxTree::Unary {
+    //     op: UnaryOp::Globally,
+    //     child: Arc::new(SyntaxTree::Binary {
+    //         op: BinaryOp::Implies,
+    //         children: Arc::new(data)
+    //     }),
+    // }
+
     // G(&(x0,->(!(x1),U(!(x1),&(x2,!(x1))))))
     // let not_x1 = Arc::new(SyntaxTree::Unary {
     //     op: UnaryOp::Not,

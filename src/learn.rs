@@ -410,10 +410,15 @@ fn check_or(left_child: &SyntaxTree, right_child: &SyntaxTree) -> bool {
 fn check_implies(left_child: &SyntaxTree, right_child: &SyntaxTree) -> bool {
     !matches!(
         (left_child, right_child),
-        // Ex falso quodlibet (True defined as False -> False)
+        // Ex falso quodlibet (True defined as ¬False)
         (
             SyntaxTree::Zeroary { op: ZeroaryOp::False },
-            SyntaxTree::Unary { .. } | SyntaxTree::Binary { .. },
+            ..,
+        )
+        // φ -> False ≡ ¬φ
+        | (
+            ..,
+            SyntaxTree::Zeroary { op: ZeroaryOp::False },
         )
         // (SyntaxTree::Zeroary { op: ZeroaryOp::False, .. }, ..)
         // // φ -> ψ ≡ ¬ψ -> ¬φ // subsumed by following rule
@@ -430,7 +435,9 @@ fn check_implies(left_child: &SyntaxTree, right_child: &SyntaxTree) -> bool {
 }
 
 fn check_until(left_child: &SyntaxTree, right_child: &SyntaxTree) -> bool {
-    match (left_child, right_child) {
+    // φ U φ ≡ φ
+    left_child != right_child
+    && match (left_child, right_child) {
         // φ U False ≡ G φ
         (
             ..,
