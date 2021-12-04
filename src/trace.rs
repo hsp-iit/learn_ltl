@@ -15,13 +15,15 @@ pub struct Sample<const N: usize> {
 
 impl<const N: usize> Sample<N> {
     pub fn is_consistent(&self, formula: &SyntaxTree) -> bool {
+        use itertools::*;
+
         self.positive_traces
             .iter()
-            .all(|trace| formula.eval(trace.as_slice()))
-            && self
-                .negative_traces
-                .iter()
-                .all(|trace| !formula.eval(trace.as_slice()))
+            .map(|trace| formula.eval(trace.as_slice()))
+            .interleave(
+                self.negative_traces.iter()
+                .map(|trace| !formula.eval(trace.as_slice()))
+            ).all(|val| val)
     }
 
     pub fn time_lenght(&self) -> Time {
