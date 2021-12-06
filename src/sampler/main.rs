@@ -84,14 +84,7 @@ fn main() {
     // };
     let formula = SyntaxTree::Binary {
         op: BinaryOp::Implies,
-        children: Arc::new((
-            SyntaxTree::Zeroary {
-                op: ZeroaryOp::AtomicProp(0)
-            },
-            SyntaxTree::Zeroary {
-                op: ZeroaryOp::AtomicProp(1)
-            }
-        )),
+        children: Arc::new((SyntaxTree::Atom(0), SyntaxTree::Atom(1))),
     };
     let sample = sample::<3>(&formula, 697, 1698 - 698, 10);
     assert!(sample.is_consistent(&formula));

@@ -1,25 +1,7 @@
 use std::{fmt, sync::Arc};
 
-// use std::num::NonZeroU8;
-// pub type ZeroaryOp = Option<NonZeroU8>;
-
 pub type Time = u8;
 pub type Var = u8;
-
-#[derive(Debug, Clone, Copy, PartialOrd, Ord, PartialEq, Eq)]
-pub enum ZeroaryOp {
-    AtomicProp(Var),
-    False,
-}
-
-impl fmt::Display for ZeroaryOp {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match *self {
-            ZeroaryOp::AtomicProp(n) => write!(f, "x{}", n),
-            ZeroaryOp::False => write!(f, "⊥"),
-        }
-    }
-}
 
 #[derive(Debug, Clone, Copy, PartialOrd, Ord, PartialEq, Eq)]
 pub enum UnaryOp {
@@ -75,9 +57,7 @@ impl fmt::Display for BinaryOp {
 
 #[derive(Debug, Clone, PartialOrd, Ord, PartialEq, Eq)]
 pub enum SyntaxTree {
-    Zeroary {
-        op: ZeroaryOp,
-    },
+    Atom(Var),
     Unary {
         op: UnaryOp,
         child: Arc<SyntaxTree>,
@@ -91,12 +71,11 @@ pub enum SyntaxTree {
 impl fmt::Display for SyntaxTree {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            SyntaxTree::Zeroary { op } => write!(f, "{}", op),
+            SyntaxTree::Atom(var) => write!(f, "x{}", var),
             SyntaxTree::Unary { op, child } => write!(f, "{}({})", op, child),
-            SyntaxTree::Binary {
-                op,
-                children,
-            } => write!(f, "({}){}({})", children.0, op, children.1),
+            SyntaxTree::Binary { op, children } => {
+                write!(f, "({}){}({})", children.0, op, children.1)
+            }
         }
     }
 }
@@ -104,14 +83,14 @@ impl fmt::Display for SyntaxTree {
 impl SyntaxTree {
     pub fn eval<const N: usize>(&self, trace: &[[bool; N]]) -> bool {
         match self {
-            SyntaxTree::Zeroary { op } => match op {
-                ZeroaryOp::False => false,
-                ZeroaryOp::AtomicProp(atomic_prop) => trace
-                    .first()
-                    .and_then(|vals| vals.get(*atomic_prop as usize))
-                    .cloned()
-                    .unwrap_or(false),
-            },
+            SyntaxTree::Atom(var) => trace
+                .first()
+                .map(|vals| {
+                    vals.get(*var as usize)
+                        .expect("interpret atomic proposition in trace")
+                })
+                .cloned()
+                .unwrap_or(false),
             SyntaxTree::Unary { op, child } => match *op {
                 UnaryOp::Not => !child.eval(trace),
                 UnaryOp::Next => {
@@ -133,10 +112,7 @@ impl SyntaxTree {
                 //     (0..(time as usize + 1).min(trace.len())).any(|t| child.eval(&trace[t..]))
                 // }
             },
-            SyntaxTree::Binary {
-                op,
-                children,
-            } => match *op {
+            SyntaxTree::Binary { op, children } => match *op {
                 BinaryOp::And => children.0.eval(trace) && children.1.eval(trace),
                 BinaryOp::Or => children.0.eval(trace) || children.1.eval(trace),
                 BinaryOp::Implies => !children.0.eval(trace) || children.1.eval(trace),
@@ -150,33 +126,32 @@ impl SyntaxTree {
                         }
                     }
                     true
-                }
-                // BinaryOp::Release => {
-                //     // TODO: it's probably possible to optimize this
-                //     let release = (0..trace.len())
-                //         .find(|t| children.0.eval(&trace[*t..]))
-                //         .unwrap_or(trace.len());
-                //     (0..=release).all(|t| children.1.eval(&trace[t..]))
-                // }
-                // BinaryOp::ReleaseLeq(time) => {
-                //     let release = (0..=time as usize)
-                //         .find(|t| children.0.eval(&trace[(*t).min(trace.len())..]))
-                //         .unwrap_or(time as usize);
-                //     (0..=release).all(|t| children.1.eval(&trace[t.min(trace.len())..]))
-                // }
-                // BinaryOp::ReleaseGneq(time) => {
-                //     let release = (time as usize + 1..trace.len())
-                //         .find(|t| children.0.eval(&trace[(*t).min(trace.len())..]))
-                //         .unwrap_or(trace.len());
-                //     (time as usize + 1..=release)
-                //         .all(|t| children.1.eval(&trace[t.min(trace.len())..]))
-                // }
-                // BinaryOp::UntillLeq(time) => {
-                //     let until = (0..=time as usize)
-                //         .find(|t| children.1.eval(&trace[(*t).min(trace.len())..]))
-                //         .unwrap_or(time as usize + 1);
-                //     (0..until).all(|t| children.0.eval(&trace[t.min(trace.len())..]))
-                // }
+                } // BinaryOp::Release => {
+                  //     // TODO: it's probably possible to optimize this
+                  //     let release = (0..trace.len())
+                  //         .find(|t| children.0.eval(&trace[*t..]))
+                  //         .unwrap_or(trace.len());
+                  //     (0..=release).all(|t| children.1.eval(&trace[t..]))
+                  // }
+                  // BinaryOp::ReleaseLeq(time) => {
+                  //     let release = (0..=time as usize)
+                  //         .find(|t| children.0.eval(&trace[(*t).min(trace.len())..]))
+                  //         .unwrap_or(time as usize);
+                  //     (0..=release).all(|t| children.1.eval(&trace[t.min(trace.len())..]))
+                  // }
+                  // BinaryOp::ReleaseGneq(time) => {
+                  //     let release = (time as usize + 1..trace.len())
+                  //         .find(|t| children.0.eval(&trace[(*t).min(trace.len())..]))
+                  //         .unwrap_or(trace.len());
+                  //     (time as usize + 1..=release)
+                  //         .all(|t| children.1.eval(&trace[t.min(trace.len())..]))
+                  // }
+                  // BinaryOp::UntillLeq(time) => {
+                  //     let until = (0..=time as usize)
+                  //         .find(|t| children.1.eval(&trace[(*t).min(trace.len())..]))
+                  //         .unwrap_or(time as usize + 1);
+                  //     (0..until).all(|t| children.0.eval(&trace[t.min(trace.len())..]))
+                  // }
             },
         }
     }
@@ -186,23 +161,9 @@ impl SyntaxTree {
 mod eval {
     use super::*;
 
-    const FALSE: SyntaxTree = SyntaxTree::Zeroary {
-        op: ZeroaryOp::False,
-    };
+    const ATOM_0: SyntaxTree = SyntaxTree::Atom(0);
 
-    const ATOM_0: SyntaxTree = SyntaxTree::Zeroary {
-        op: ZeroaryOp::AtomicProp(0),
-    };
-
-    const ATOM_1: SyntaxTree = SyntaxTree::Zeroary {
-        op: ZeroaryOp::AtomicProp(1),
-    };
-
-    #[test]
-    fn r#false() {
-        let trace = [[]];
-        assert!(!FALSE.eval(&trace));
-    }
+    const ATOM_1: SyntaxTree = SyntaxTree::Atom(1);
 
     #[test]
     fn atomic_prop() {

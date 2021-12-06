@@ -21,9 +21,11 @@ impl<const N: usize> Sample<N> {
             .iter()
             .map(|trace| formula.eval(trace.as_slice()))
             .interleave(
-                self.negative_traces.iter()
-                .map(|trace| !formula.eval(trace.as_slice()))
-            ).all(|val| val)
+                self.negative_traces
+                    .iter()
+                    .map(|trace| !formula.eval(trace.as_slice())),
+            )
+            .all(|val| val)
     }
 
     pub fn time_lenght(&self) -> Time {
