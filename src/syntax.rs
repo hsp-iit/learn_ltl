@@ -275,7 +275,7 @@ mod eval {
     #[test]
     fn or() {
         let formula = SyntaxTree::Binary {
-            op: BinaryOp::And,
+            op: BinaryOp::Or,
             children: Arc::new((ATOM_0, ATOM_1)),
         };
 
@@ -289,7 +289,7 @@ mod eval {
     #[test]
     fn until() {
         let formula = SyntaxTree::Binary {
-            op: BinaryOp::And,
+            op: BinaryOp::Until,
             children: Arc::new((ATOM_0, ATOM_1)),
         };
 

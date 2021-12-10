@@ -5,14 +5,41 @@ use std::io::BufWriter;
 use std::sync::Arc;
 
 fn main() {
-    // // G ( ( ( !x_2 ) => ( F x_6 ) ) U (x_2 || x_5) )
-    // let formula = SyntaxTree::Unary {
-    //     op: UnaryOp::Globally,
-    //     child: Arc::new(SyntaxTree::Binary {
-    //         op: BinaryOp::Implies,
-    //         children: Arc::new(data)
-    //     }),
-    // }
+    // // G ( ( ( !x_2 && x_1 ) => ( F x_6 ) ) U (x_2 || x_5) )
+    let sub_formula_3 = SyntaxTree::Binary {
+        op: BinaryOp::And,
+        children: Arc::new((
+            SyntaxTree::Atom(1),
+            SyntaxTree::Unary {
+                op: UnaryOp::Not,
+                child: Arc::new(SyntaxTree::Atom(2))
+            },
+        ))
+    };
+    let sub_formula_1 = SyntaxTree::Binary {
+        op: BinaryOp::Implies,
+        children: Arc::new((
+            sub_formula_3,
+            SyntaxTree::Unary {
+                op: UnaryOp::Finally,
+                child: Arc::new(SyntaxTree::Atom(6))
+            }
+        ))
+    };
+    let sub_formula_2 = SyntaxTree::Binary {
+        op: BinaryOp::Or,
+        children: Arc::new((
+            SyntaxTree::Atom(2),
+            SyntaxTree::Atom(5)
+        ))
+    };
+    let formula = SyntaxTree::Unary {
+        op: UnaryOp::Globally,
+        child: Arc::new(SyntaxTree::Binary {
+            op: BinaryOp::Until,
+            children: Arc::new((sub_formula_1, sub_formula_2))
+        }),
+    };
 
     // G(&(x0,->(!(x1),U(!(x1),&(x2,!(x1))))))
     // let not_x1 = Arc::new(SyntaxTree::Unary {
@@ -82,11 +109,11 @@ fn main() {
     //         op: ZeroaryOp::AtomicProp(1)
     //     }),
     // };
-    let formula = SyntaxTree::Binary {
-        op: BinaryOp::Implies,
-        children: Arc::new((SyntaxTree::Atom(0), SyntaxTree::Atom(1))),
-    };
-    let sample = sample::<3>(&formula, 697, 1698 - 698, 10);
+    // let formula = SyntaxTree::Binary {
+    //     op: BinaryOp::Implies,
+    //     children: Arc::new((SyntaxTree::Atom(0), SyntaxTree::Atom(1))),
+    // };
+    let sample = sample::<10>(&formula, 100, 100, 1000);
     assert!(sample.is_consistent(&formula));
     let name = format!("sample_{}.ron", formula);
     let file = File::create(name).expect("open sample file");

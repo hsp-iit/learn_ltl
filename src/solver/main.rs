@@ -10,8 +10,9 @@ fn main() -> std::io::Result<()> {
     // let file = File::open("sample_(G(¬(x0)))∨(F((x0)∧(F(x1)))).ron")?;
     // let file = File::open("sample_0077.ron")?;
     // let file = File::open("sample197.ron")?;
-    let file = File::open("sample_tbth01.ron")?;
+    // let file = File::open("sample_tbth01.ron")?;
     // let file = File::open("sample_G((x0)∧((¬(x1))→((¬(x1))U((x2)∧(¬(x1)))))).ron")?;
+    let file = File::open("sample_G((((x1)∧(¬(x2)))→(F(x6)))U((x2)∨(x5))).ron")?;
     let mut buf_reader = BufReader::new(file);
     let mut contents = Vec::new();
     buf_reader.read_to_end(&mut contents)?;
@@ -51,7 +52,7 @@ fn _load_and_solve(contents: Vec<u8>) -> Option<SyntaxTree> {
 
 fn load_and_par_solve(contents: Vec<u8>) -> Option<SyntaxTree> {
     // Ugly hack to get around limitations of deserialization for types with const generics.
-    (1..=5).into_iter().find_map(|n| {
+    (1..).into_iter().find_map(|n| {
         match n {
             0 => ron::de::from_bytes::<Sample<0>>(&contents)
                 .map(|sample| par_brute_solve(&sample, true)),
@@ -64,6 +65,16 @@ fn load_and_par_solve(contents: Vec<u8>) -> Option<SyntaxTree> {
             4 => ron::de::from_bytes::<Sample<4>>(&contents)
                 .map(|sample| par_brute_solve(&sample, true)),
             5 => ron::de::from_bytes::<Sample<5>>(&contents)
+                .map(|sample| par_brute_solve(&sample, true)),
+            6 => ron::de::from_bytes::<Sample<6>>(&contents)
+                .map(|sample| par_brute_solve(&sample, true)),
+            7 => ron::de::from_bytes::<Sample<7>>(&contents)
+                .map(|sample| par_brute_solve(&sample, true)),
+            8 => ron::de::from_bytes::<Sample<8>>(&contents)
+                .map(|sample| par_brute_solve(&sample, true)),
+            9 => ron::de::from_bytes::<Sample<9>>(&contents)
+                .map(|sample| par_brute_solve(&sample, true)),
+            10 => ron::de::from_bytes::<Sample<10>>(&contents)
                 .map(|sample| par_brute_solve(&sample, true)),
             _ => panic!("out-of-bound parameter"),
         }

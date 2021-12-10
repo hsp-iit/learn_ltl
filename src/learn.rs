@@ -8,12 +8,14 @@ use std::sync::Arc;
 enum SkeletonTree {
     Zeroary,
     Unary(Arc<SkeletonTree>),
-    Binary((Arc<SkeletonTree>, Arc<SkeletonTree>)),
+    Binary(Arc<(SkeletonTree, SkeletonTree)>),
 }
 
 impl SkeletonTree {
     fn gen(size: usize) -> Vec<SkeletonTree> {
         if size == 0 {
+            Vec::new()
+        } else if size == 1 {
             vec![SkeletonTree::Zeroary]
         } else {
             let smaller_skeletons = Self::gen(size - 1);
@@ -21,7 +23,7 @@ impl SkeletonTree {
                 .into_iter()
                 .map(|child| SkeletonTree::Unary(Arc::new(child)))
                 .collect();
-            for left_size in 0..size {
+            for left_size in 1..(size - 1) {
                 let left_smaller_skeletons = Self::gen(left_size);
                 let right_smaller_skeletons = Self::gen(size - 1 - left_size);
 
@@ -30,7 +32,7 @@ impl SkeletonTree {
                         .into_iter()
                         .cartesian_product(right_smaller_skeletons.into_iter())
                         .map(|(left_child, right_child)| {
-                            SkeletonTree::Binary((Arc::new(left_child), Arc::new(right_child)))
+                            SkeletonTree::Binary(Arc::new((left_child, right_child)))
                         }),
                 );
             }
@@ -46,81 +48,86 @@ impl SkeletonTree {
                     .collect::<Vec<SyntaxTree>>()
             }
             SkeletonTree::Unary(child) => {
-                let mut trees = Vec::new();
                 let children = child.gen_formulae::<N>();
+                let mut trees = Vec::with_capacity(4 * children.len()) ;
 
                 for child in children {
-                    let a_child = Arc::new(child.clone());
+                    let child = Arc::new(child);
 
-                    if check_globally(&child) {
-                        trees.push(SyntaxTree::Unary {
-                            op: UnaryOp::Globally,
-                            child: a_child.clone(),
-                        });
-                    }
-                    if check_finally(&child) {
-                        trees.push(SyntaxTree::Unary {
-                            op: UnaryOp::Finally,
-                            child: a_child.clone(),
-                        });
-                    }
-
-                    if check_not(&child) {
+                    if check_not(child.as_ref()) {
                         trees.push(SyntaxTree::Unary {
                             op: UnaryOp::Not,
-                            child: a_child.clone(),
+                            child: child.clone(),
                         });
                     }
 
-                    if check_next(&child) {
+                    if check_next(child.as_ref()) {
                         trees.push(SyntaxTree::Unary {
                             op: UnaryOp::Next,
-                            child: a_child,
+                            child: child.clone(),
+                        });
+                    }
+
+                    if check_globally(child.as_ref()) {
+                        trees.push(SyntaxTree::Unary {
+                            op: UnaryOp::Globally,
+                            child: child.clone(),
+                        });
+                    }
+
+                    if check_finally(child.as_ref()) {
+                        trees.push(SyntaxTree::Unary {
+                            op: UnaryOp::Finally,
+                            child,
                         });
                     }
                 }
 
+                trees.shrink_to_fit();
+
                 trees
             }
             SkeletonTree::Binary(child) => {
-                let mut trees = Vec::new();
                 let left_children = child.0.gen_formulae::<N>();
                 let right_children = child.1.gen_formulae::<N>();
+                let mut trees = Vec::with_capacity(4 * left_children.len() * right_children.len());
                 let children = left_children
                     .into_iter()
                     .cartesian_product(right_children.into_iter());
 
                 for (left_child, right_child) in children {
-                    let children = Arc::new((left_child.clone(), right_child.clone()));
+                    let children = Arc::new((left_child, right_child));
 
-                    if check_and(&left_child, &right_child) {
+                    if check_and(children.as_ref()) {
                         trees.push(SyntaxTree::Binary {
                             op: BinaryOp::And,
                             children: children.clone(),
                         });
                     }
 
-                    if check_or(&left_child, &right_child) {
+                    if check_or(children.as_ref()) {
                         trees.push(SyntaxTree::Binary {
                             op: BinaryOp::Or,
                             children: children.clone(),
                         });
                     }
 
-                    if check_implies(&left_child, &right_child) {
+                    if check_implies(children.as_ref()) {
                         trees.push(SyntaxTree::Binary {
                             op: BinaryOp::Implies,
                             children: children.clone(),
                         });
                     }
 
-                    if check_until(&left_child, &right_child) {
+                    if check_until(children.as_ref()) {
                         trees.push(SyntaxTree::Binary {
                             op: BinaryOp::Until,
                             children,
                         });
                     }
                 }
+
+                trees.shrink_to_fit();
 
                 trees
             }
@@ -129,7 +136,7 @@ impl SkeletonTree {
 }
 
 pub fn brute_solve<const N: usize>(sample: &Sample<N>, log: bool) -> Option<SyntaxTree> {
-    (0..).into_iter().find_map(|size| {
+    (1..).into_iter().find_map(|size| {
         if log {
             println!("Searching formulae of size {}", size);
         }
@@ -144,7 +151,7 @@ pub fn brute_solve<const N: usize>(sample: &Sample<N>, log: bool) -> Option<Synt
 pub fn par_brute_solve<const N: usize>(sample: &Sample<N>, log: bool) -> Option<SyntaxTree> {
     use rayon::prelude::*;
 
-    (0..).into_iter().find_map(|size| {
+    (1..).into_iter().find_map(|size| {
         if log {
             println!("Generating formulae of size {}", size);
         }
@@ -210,7 +217,7 @@ fn check_finally(child: &SyntaxTree) -> bool {
     )
 }
 
-fn check_and(left_child: &SyntaxTree, right_child: &SyntaxTree) -> bool {
+fn check_and((left_child, right_child): &(SyntaxTree, SyntaxTree)) -> bool {
     // Commutative law
     left_child < right_child
         && match (left_child, right_child) {
@@ -266,7 +273,7 @@ fn check_and(left_child: &SyntaxTree, right_child: &SyntaxTree) -> bool {
     }
 }
 
-fn check_or(left_child: &SyntaxTree, right_child: &SyntaxTree) -> bool {
+fn check_or((left_child, right_child): &(SyntaxTree, SyntaxTree)) -> bool {
     // Commutative law
     left_child < right_child
         && match (left_child, right_child) {
@@ -395,7 +402,7 @@ fn check_or(left_child: &SyntaxTree, right_child: &SyntaxTree) -> bool {
     }
 }
 
-fn check_implies(left_child: &SyntaxTree, right_child: &SyntaxTree) -> bool {
+fn check_implies((left_child, right_child): &(SyntaxTree, SyntaxTree)) -> bool {
     !matches!(
         (left_child, right_child),
         // // Ex falso quodlibet (True defined as ¬False)
@@ -422,7 +429,7 @@ fn check_implies(left_child: &SyntaxTree, right_child: &SyntaxTree) -> bool {
     )
 }
 
-fn check_until(left_child: &SyntaxTree, right_child: &SyntaxTree) -> bool {
+fn check_until((left_child, right_child): &(SyntaxTree, SyntaxTree)) -> bool {
     // φ U φ ≡ φ
     left_child != right_child
         && match (left_child, right_child) {
