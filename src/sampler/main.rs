@@ -1,136 +1,173 @@
+use clap::Parser;
 use learn_pltl_fast::*;
 use std::fs::File;
+use std::io::BufReader;
 use std::io::BufWriter;
+use std::io::Read;
 
-use std::sync::Arc;
+/// Generate a sample consistent with the given formula
+#[derive(Parser, Debug)]
+#[clap(name = "sampler")]
+struct Sampler {
+    /// Filename of the target formula
+    #[clap(short, long)]
+    formula: String,
 
-fn main() {
-    // // G ( ( ( !x_2 && x_1 ) => ( F x_6 ) ) U (x_2 || x_5) )
-    let sub_formula_3 = SyntaxTree::Binary {
-        op: BinaryOp::And,
-        children: Arc::new((
-            SyntaxTree::Atom(1),
-            SyntaxTree::Unary {
-                op: UnaryOp::Not,
-                child: Arc::new(SyntaxTree::Atom(2))
-            },
-        ))
-    };
-    let sub_formula_1 = SyntaxTree::Binary {
-        op: BinaryOp::Implies,
-        children: Arc::new((
-            sub_formula_3,
-            SyntaxTree::Unary {
-                op: UnaryOp::Finally,
-                child: Arc::new(SyntaxTree::Atom(6))
-            }
-        ))
-    };
-    let sub_formula_2 = SyntaxTree::Binary {
-        op: BinaryOp::Or,
-        children: Arc::new((
-            SyntaxTree::Atom(2),
-            SyntaxTree::Atom(5)
-        ))
-    };
-    let formula = SyntaxTree::Unary {
-        op: UnaryOp::Globally,
-        child: Arc::new(SyntaxTree::Binary {
-            op: BinaryOp::Until,
-            children: Arc::new((sub_formula_1, sub_formula_2))
-        }),
-    };
+    /// Number of positive traces
+    #[clap(short, long)]
+    positives: usize,
 
-    // G(&(x0,->(!(x1),U(!(x1),&(x2,!(x1))))))
-    // let not_x1 = Arc::new(SyntaxTree::Unary {
-    //     op: UnaryOp::Not,
-    //     child: Arc::new(SyntaxTree::Zeroary {
-    //         op: ZeroaryOp::AtomicProp(1),
-    //     }),
-    // });
-    // let formula = SyntaxTree::Unary {
-    //     op: UnaryOp::Globally,
-    //     child: Arc::new(SyntaxTree::Binary {
-    //         op: BinaryOp::And,
-    //         left_child: Arc::new(SyntaxTree::Zeroary {
-    //             op: ZeroaryOp::AtomicProp(0),
-    //         }),
-    //         right_child: Arc::new(SyntaxTree::Binary {
-    //             op: BinaryOp::Implies,
-    //             left_child: not_x1.clone(),
-    //             right_child: Arc::new(SyntaxTree::Binary {
-    //                 op: BinaryOp::Until,
-    //                 left_child: not_x1.clone(),
-    //                 right_child: Arc::new(SyntaxTree::Binary {
-    //                     op: BinaryOp::And,
-    //                     left_child: Arc::new(SyntaxTree::Zeroary {
-    //                         op: ZeroaryOp::AtomicProp(2),
-    //                     }),
-    //                     right_child: not_x1,
-    //                 }),
-    //             }),
-    //         }),
-    //     }),
-    // };
+    /// Number of negative traces
+    #[clap(short, long)]
+    negatives: usize,
 
-    // let formula = SyntaxTree::Binary {
-    //     op: BinaryOp::Or,
-    //     left_child: Arc::new(SyntaxTree::Unary {
-    //         op: UnaryOp::Globally,
-    //         child: Arc::new(SyntaxTree::Unary {
-    //             op: UnaryOp::Not,
-    //             child: Arc::new(SyntaxTree::Zeroary {
-    //                 op: ZeroaryOp::AtomicProp(0),
-    //             }),
-    //         }),
-    //     }),
-    //     right_child: Arc::new(SyntaxTree::Unary {
-    //         op: UnaryOp::Finally,
-    //         child: Arc::new(SyntaxTree::Binary {
-    //             op: BinaryOp::And,
-    //             left_child: Arc::new(SyntaxTree::Zeroary {
-    //                 op: ZeroaryOp::AtomicProp(0),
-    //             }),
-    //             right_child: Arc::new(SyntaxTree::Unary {
-    //                 op: UnaryOp::Finally,
-    //                 child: Arc::new(SyntaxTree::Zeroary {
-    //                     op: ZeroaryOp::AtomicProp(1),
-    //                 }),
-    //             }),
-    //         }),
-    //     }),
-    // };
-    // let formula = SyntaxTree::Binary {
-    //     op: BinaryOp::Until,
-    //     left_child: Arc::new(SyntaxTree::Zeroary {
-    //         op: ZeroaryOp::AtomicProp(0)
-    //     }),
-    //     right_child: Arc::new(SyntaxTree::Zeroary {
-    //         op: ZeroaryOp::AtomicProp(1)
-    //     }),
-    // };
-    // let formula = SyntaxTree::Binary {
-    //     op: BinaryOp::Implies,
-    //     children: Arc::new((SyntaxTree::Atom(0), SyntaxTree::Atom(1))),
-    // };
-    let sample = sample::<10>(&formula, 100, 100, 1000);
-    assert!(sample.is_consistent(&formula));
+    /// Length of traces
+    #[clap(short, long)]
+    length: usize,
+}
+
+fn main() -> std::io::Result<()> {
+    let sampler = Sampler::parse();
+
+    let file = File::open(sampler.formula)?;
+    let mut buf_reader = BufReader::new(file);
+    let mut contents = Vec::new();
+    buf_reader.read_to_end(&mut contents)?;
+    let formula = ron::de::from_bytes::<SyntaxTree>(&contents).expect("formula");
+    let vars = formula.vars();
+
     let name = format!("sample_{}.ron", formula);
     let file = File::create(name).expect("open sample file");
     let buf_writer = BufWriter::new(file);
-    ron::ser::to_writer(buf_writer, &sample).expect("serialize sample");
+
+    // Ugly hack to get around limitations of deserialization for types with const generics.
+    match vars {
+        0 => {
+            let sample = sample::<0>(
+                &formula,
+                sampler.positives,
+                sampler.negatives,
+                sampler.length,
+            );
+            assert!(sample.is_consistent(&formula));
+            ron::ser::to_writer(buf_writer, &sample).expect("serialize sample");
+        }
+        1 => {
+            let sample = sample::<1>(
+                &formula,
+                sampler.positives,
+                sampler.negatives,
+                sampler.length,
+            );
+            assert!(sample.is_consistent(&formula));
+            ron::ser::to_writer(buf_writer, &sample).expect("serialize sample");
+        }
+        2 => {
+            let sample = sample::<2>(
+                &formula,
+                sampler.positives,
+                sampler.negatives,
+                sampler.length,
+            );
+            assert!(sample.is_consistent(&formula));
+            ron::ser::to_writer(buf_writer, &sample).expect("serialize sample");
+        }
+        3 => {
+            let sample = sample::<3>(
+                &formula,
+                sampler.positives,
+                sampler.negatives,
+                sampler.length,
+            );
+            assert!(sample.is_consistent(&formula));
+            ron::ser::to_writer(buf_writer, &sample).expect("serialize sample");
+        }
+        4 => {
+            let sample = sample::<4>(
+                &formula,
+                sampler.positives,
+                sampler.negatives,
+                sampler.length,
+            );
+            assert!(sample.is_consistent(&formula));
+            ron::ser::to_writer(buf_writer, &sample).expect("serialize sample");
+        }
+        5 => {
+            let sample = sample::<5>(
+                &formula,
+                sampler.positives,
+                sampler.negatives,
+                sampler.length,
+            );
+            assert!(sample.is_consistent(&formula));
+            ron::ser::to_writer(buf_writer, &sample).expect("serialize sample");
+        }
+        6 => {
+            let sample = sample::<6>(
+                &formula,
+                sampler.positives,
+                sampler.negatives,
+                sampler.length,
+            );
+            assert!(sample.is_consistent(&formula));
+            ron::ser::to_writer(buf_writer, &sample).expect("serialize sample");
+        }
+        7 => {
+            let sample = sample::<7>(
+                &formula,
+                sampler.positives,
+                sampler.negatives,
+                sampler.length,
+            );
+            assert!(sample.is_consistent(&formula));
+            ron::ser::to_writer(buf_writer, &sample).expect("serialize sample");
+        }
+        8 => {
+            let sample = sample::<8>(
+                &formula,
+                sampler.positives,
+                sampler.negatives,
+                sampler.length,
+            );
+            assert!(sample.is_consistent(&formula));
+            ron::ser::to_writer(buf_writer, &sample).expect("serialize sample");
+        }
+        9 => {
+            let sample = sample::<9>(
+                &formula,
+                sampler.positives,
+                sampler.negatives,
+                sampler.length,
+            );
+            assert!(sample.is_consistent(&formula));
+            ron::ser::to_writer(buf_writer, &sample).expect("serialize sample");
+        }
+        10 => {
+            let sample = sample::<10>(
+                &formula,
+                sampler.positives,
+                sampler.negatives,
+                sampler.length,
+            );
+            assert!(sample.is_consistent(&formula));
+            ron::ser::to_writer(buf_writer, &sample).expect("serialize sample");
+        }
+        _ => panic!("out-of-bound parameter"),
+    }
+
+    Ok(())
 }
 
 fn sample<const N: usize>(
     formula: &SyntaxTree,
     positives: usize,
     negatives: usize,
-    lenght: usize,
+    length: usize,
 ) -> Sample<N> {
     let mut positive_traces = Vec::new();
     let mut negative_traces = Vec::new();
     while positive_traces.len() < positives || negative_traces.len() < negatives {
-        let trace = Vec::from_iter((0..lenght).map(|_| gen_bools()));
+        let trace = Vec::from_iter((0..length).map(|_| gen_bools()));
         let satisfaction = formula.eval(&trace);
         if satisfaction && positive_traces.len() < positives {
             positive_traces.push(trace);

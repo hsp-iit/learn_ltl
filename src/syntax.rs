@@ -1,9 +1,10 @@
+use serde::Deserialize;
 use std::{fmt, sync::Arc};
 
 pub type Time = u8;
-pub type Var = u8;
+pub type Idx = u8;
 
-#[derive(Debug, Clone, Copy, PartialOrd, Ord, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialOrd, Ord, PartialEq, Eq, Deserialize)]
 pub enum UnaryOp {
     Not,
     Next,
@@ -28,7 +29,7 @@ impl fmt::Display for UnaryOp {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialOrd, Ord, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialOrd, Ord, PartialEq, Eq, Deserialize)]
 pub enum BinaryOp {
     And,
     Or,
@@ -44,7 +45,7 @@ impl fmt::Display for BinaryOp {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match *self {
             BinaryOp::And => write!(f, "∧"),
-            BinaryOp::Or => write!(f, "∨"),
+            BinaryOp::Or => write!(f, "v"),
             BinaryOp::Implies => write!(f, "→"),
             BinaryOp::Until => write!(f, "U"),
             // BinaryOp::Release => write!(f, "R"),
@@ -55,9 +56,9 @@ impl fmt::Display for BinaryOp {
     }
 }
 
-#[derive(Debug, Clone, PartialOrd, Ord, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialOrd, Ord, PartialEq, Eq, Deserialize)]
 pub enum SyntaxTree {
-    Atom(Var),
+    Atom(Idx),
     Unary {
         op: UnaryOp,
         child: Arc<SyntaxTree>,
@@ -81,6 +82,14 @@ impl fmt::Display for SyntaxTree {
 }
 
 impl SyntaxTree {
+    pub fn vars(&self) -> Idx {
+        (match self {
+            SyntaxTree::Atom(n) => *n,
+            SyntaxTree::Unary { child, .. } => child.as_ref().vars(),
+            SyntaxTree::Binary { children, .. } => children.0.vars().max(children.1.vars()),
+        }) + 1
+    }
+
     pub fn eval<const N: usize>(&self, trace: &[[bool; N]]) -> bool {
         match self {
             SyntaxTree::Atom(var) => trace

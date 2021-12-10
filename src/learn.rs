@@ -6,50 +6,48 @@ use std::sync::Arc;
 
 #[derive(Debug, Clone)]
 enum SkeletonTree {
-    Zeroary,
-    Unary(Arc<SkeletonTree>),
-    Binary(Arc<(SkeletonTree, SkeletonTree)>),
+    Leaf,
+    UnaryNode(Arc<SkeletonTree>),
+    BinaryNode(Arc<(SkeletonTree, SkeletonTree)>),
 }
 
 impl SkeletonTree {
     fn gen(size: usize) -> Vec<SkeletonTree> {
-        if size == 0 {
-            Vec::new()
-        } else if size == 1 {
-            vec![SkeletonTree::Zeroary]
-        } else {
-            let smaller_skeletons = Self::gen(size - 1);
-            let mut skeletons: Vec<SkeletonTree> = smaller_skeletons
-                .into_iter()
-                .map(|child| SkeletonTree::Unary(Arc::new(child)))
-                .collect();
-            for left_size in 1..(size - 1) {
-                let left_smaller_skeletons = Self::gen(left_size);
-                let right_smaller_skeletons = Self::gen(size - 1 - left_size);
+        match size {
+            0 => Vec::new(),
+            1 => vec![SkeletonTree::Leaf],
+            size => {
+                let smaller_skeletons = Self::gen(size - 1);
+                let mut skeletons: Vec<SkeletonTree> = smaller_skeletons
+                    .into_iter()
+                    .map(|branch| SkeletonTree::UnaryNode(Arc::new(branch)))
+                    .collect();
+                for left_size in 1..(size - 1) {
+                    let left_smaller_skeletons = Self::gen(left_size);
+                    let right_smaller_skeletons = Self::gen(size - 1 - left_size);
 
-                skeletons.extend(
-                    left_smaller_skeletons
-                        .into_iter()
-                        .cartesian_product(right_smaller_skeletons.into_iter())
-                        .map(|(left_child, right_child)| {
-                            SkeletonTree::Binary(Arc::new((left_child, right_child)))
-                        }),
-                );
+                    skeletons.extend(
+                        left_smaller_skeletons
+                            .into_iter()
+                            .cartesian_product(right_smaller_skeletons.into_iter())
+                            .map(|(left_branch, right_branch)| {
+                                SkeletonTree::BinaryNode(Arc::new((left_branch, right_branch)))
+                            }),
+                    );
+                }
+                skeletons
             }
-            skeletons
         }
     }
 
     fn gen_formulae<const N: usize>(&self) -> Vec<SyntaxTree> {
         match self {
-            SkeletonTree::Zeroary => {
-                (0..N)
-                    .map(|n| SyntaxTree::Atom(n as Var))
-                    .collect::<Vec<SyntaxTree>>()
-            }
-            SkeletonTree::Unary(child) => {
+            SkeletonTree::Leaf => (0..N)
+                .map(|n| SyntaxTree::Atom(n as Idx))
+                .collect::<Vec<SyntaxTree>>(),
+            SkeletonTree::UnaryNode(child) => {
                 let children = child.gen_formulae::<N>();
-                let mut trees = Vec::with_capacity(4 * children.len()) ;
+                let mut trees = Vec::with_capacity(4 * children.len());
 
                 for child in children {
                     let child = Arc::new(child);
@@ -87,7 +85,7 @@ impl SkeletonTree {
 
                 trees
             }
-            SkeletonTree::Binary(child) => {
+            SkeletonTree::BinaryNode(child) => {
                 let left_children = child.0.gen_formulae::<N>();
                 let right_children = child.1.gen_formulae::<N>();
                 let mut trees = Vec::with_capacity(4 * left_children.len() * right_children.len());
@@ -187,9 +185,8 @@ fn check_next(child: &SyntaxTree) -> bool {
         SyntaxTree::Unary {
             op: UnaryOp::Next,
             ..
-        }
-        // // X False ≡ False
-        // | SyntaxTree::Zeroary { op: ZeroaryOp::False }
+        } // // X False ≡ False
+          // | SyntaxTree::Zeroary { op: ZeroaryOp::False }
     )
 }
 
