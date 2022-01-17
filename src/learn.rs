@@ -14,7 +14,7 @@ enum SkeletonTree {
 impl SkeletonTree {
     fn gen(size: usize) -> Vec<SkeletonTree> {
         match size {
-            0 => Vec::new(),
+            0 => panic!("No tree of size 0"),
             1 => vec![SkeletonTree::Leaf],
             size => {
                 let smaller_skeletons = Self::gen(size - 1);
@@ -30,9 +30,7 @@ impl SkeletonTree {
                         left_smaller_skeletons
                             .into_iter()
                             .cartesian_product(right_smaller_skeletons.into_iter())
-                            .map(|(left_branch, right_branch)| {
-                                SkeletonTree::BinaryNode(Arc::new((left_branch, right_branch)))
-                            }),
+                            .map(|branches| SkeletonTree::BinaryNode(Arc::new(branches))),
                     );
                 }
                 skeletons
@@ -133,17 +131,17 @@ impl SkeletonTree {
     }
 }
 
-pub fn brute_solve<const N: usize>(sample: &Sample<N>, log: bool) -> Option<SyntaxTree> {
-    (1..).into_iter().find_map(|size| {
-        if log {
-            println!("Searching formulae of size {}", size);
-        }
-        SkeletonTree::gen(size)
-            .into_iter()
-            .flat_map(|skeleton| skeleton.gen_formulae::<N>())
-            .find(|formula| sample.is_consistent(formula))
-    })
-}
+// pub fn brute_solve<const N: usize>(sample: &Sample<N>, log: bool) -> Option<SyntaxTree> {
+//     (1..).into_iter().find_map(|size| {
+//         if log {
+//             println!("Searching formulae of size {}", size);
+//         }
+//         SkeletonTree::gen(size)
+//             .into_iter()
+//             .flat_map(|skeleton| skeleton.gen_formulae::<N>())
+//             .find(|formula| sample.is_consistent(formula))
+//     })
+// }
 
 // Parallel search is faster but less consistent then single-threaded search
 pub fn par_brute_solve<const N: usize>(sample: &Sample<N>, log: bool) -> Option<SyntaxTree> {
@@ -151,12 +149,22 @@ pub fn par_brute_solve<const N: usize>(sample: &Sample<N>, log: bool) -> Option<
 
     (1..).into_iter().find_map(|size| {
         if log {
-            println!("Generating formulae of size {}", size);
+            println!("Searching formulae of size {}", size);
         }
-        SkeletonTree::gen(size)
-            .into_par_iter()
-            .flat_map(|skeleton| skeleton.gen_formulae::<N>())
-            .find_any(|formula| sample.is_consistent(formula))
+        // At small size, the overhead is not worth it.
+        if size < 6 {
+            SkeletonTree::gen(size)
+                .into_iter()
+                .flat_map(|skeleton| skeleton.gen_formulae::<N>())
+                .find(|formula| sample.is_consistent(formula))
+        } else {
+            SkeletonTree::gen(size)
+                .into_par_iter()
+                // .flat_map_iter(|skeleton| skeleton.gen_formulae::<N>())
+                // .find_map_any(|skeleton| skeleton.gen_formulae::<N>().into_iter().find(|formula| sample.is_consistent(formula)))
+                .flat_map(|skeleton| skeleton.gen_formulae::<N>())
+                .find_any(|formula| sample.is_consistent(formula))
+        }
     })
 }
 
@@ -464,3 +472,5 @@ fn check_until((left_child, right_child): &(SyntaxTree, SyntaxTree)) -> bool {
             _ => true,
         }
 }
+
+// TODO: write tests for checks

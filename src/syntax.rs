@@ -83,11 +83,11 @@ impl fmt::Display for SyntaxTree {
 
 impl SyntaxTree {
     pub fn vars(&self) -> Idx {
-        (match self {
-            SyntaxTree::Atom(n) => *n,
+        match self {
+            SyntaxTree::Atom(n) => *n + 1,
             SyntaxTree::Unary { child, .. } => child.as_ref().vars(),
             SyntaxTree::Binary { children, .. } => children.0.vars().max(children.1.vars()),
-        }) + 1
+        }
     }
 
     pub fn eval<const N: usize>(&self, trace: &[[bool; N]]) -> bool {
