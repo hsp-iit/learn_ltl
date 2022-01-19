@@ -1,44 +1,39 @@
 use serde::Deserialize;
 use std::{fmt, sync::Arc};
 
+/// The type representing time instants.
 pub type Time = u8;
+
+/// The type of indexes of propositional variables.
 pub type Idx = u8;
 
+/// Unary operators.
 #[derive(Debug, Clone, Copy, PartialOrd, Ord, PartialEq, Eq, Deserialize)]
 pub enum UnaryOp {
     Not,
     Next,
     Globally,
     Finally,
-    // GloballyLeq(Time),
-    // GloballyGneq(Time),
-    // FinallyLeq(Time),
 }
 
 impl fmt::Display for UnaryOp {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match *self {
-            // UnaryOp::FinallyLeq(n) => write!(f, "F≤{}", n),
             UnaryOp::Globally => write!(f, "G"),
             UnaryOp::Finally => write!(f, "F"),
-            // UnaryOp::GloballyGneq(n) => write!(f, "G>{}", n),
-            // UnaryOp::GloballyLeq(n) => write!(f, "G≤{}", n),
             UnaryOp::Next => write!(f, "X"),
             UnaryOp::Not => write!(f, "¬"),
         }
     }
 }
 
+/// Binary operators
 #[derive(Debug, Clone, Copy, PartialOrd, Ord, PartialEq, Eq, Deserialize)]
 pub enum BinaryOp {
     And,
     Or,
     Implies,
     Until,
-    // Release,
-    // ReleaseLeq(Time),
-    // ReleaseGneq(Time),
-    // UntillLeq(Time),
 }
 
 impl fmt::Display for BinaryOp {
@@ -48,14 +43,13 @@ impl fmt::Display for BinaryOp {
             BinaryOp::Or => write!(f, "v"),
             BinaryOp::Implies => write!(f, "→"),
             BinaryOp::Until => write!(f, "U"),
-            // BinaryOp::Release => write!(f, "R"),
-            // BinaryOp::ReleaseGneq(t) => write!(f, "R>{}", t),
-            // BinaryOp::ReleaseLeq(t) => write!(f, "R≤{}", t),
-            // BinaryOp::UntillLeq(t) => write!(f, "U≤{}", t),
         }
     }
 }
 
+/// A formula represented via its syntax tree.
+/// This is a recursive data structure, so it requires the use of smart pointers.
+/// We use `Arc` to make it compatible with parallel computations.
 #[derive(Debug, Clone, PartialOrd, Ord, PartialEq, Eq, Deserialize)]
 pub enum SyntaxTree {
     Atom(Idx),
@@ -82,6 +76,8 @@ impl fmt::Display for SyntaxTree {
 }
 
 impl SyntaxTree {
+    /// Returns the highest propositional variable index appearing in the formula, plus 1.
+    /// Used to count how many variables are needed to interpret the formula.
     pub fn vars(&self) -> Idx {
         match self {
             SyntaxTree::Atom(n) => *n + 1,
@@ -90,6 +86,7 @@ impl SyntaxTree {
         }
     }
 
+    /// Evaluate a formula on a trace.
     pub fn eval<const N: usize>(&self, trace: &[[bool; N]]) -> bool {
         match self {
             SyntaxTree::Atom(var) => trace
@@ -111,15 +108,6 @@ impl SyntaxTree {
                 }
                 UnaryOp::Globally => (0..trace.len()).all(|t| child.eval(&trace[t..])),
                 UnaryOp::Finally => (0..trace.len()).any(|t| child.eval(&trace[t..])),
-                // UnaryOp::GloballyLeq(time) => {
-                //     (0..(time as usize + 1).min(trace.len())).all(|t| child.eval(&trace[t..]))
-                // }
-                // UnaryOp::GloballyGneq(time) => {
-                //     (time as usize + 1..trace.len()).all(|t| child.eval(&trace[t..]))
-                // }
-                // UnaryOp::FinallyLeq(time) => {
-                //     (0..(time as usize + 1).min(trace.len())).any(|t| child.eval(&trace[t..]))
-                // }
             },
             SyntaxTree::Binary { op, children } => match *op {
                 BinaryOp::And => children.0.eval(trace) && children.1.eval(trace),
@@ -135,32 +123,7 @@ impl SyntaxTree {
                         }
                     }
                     true
-                } // BinaryOp::Release => {
-                  //     // TODO: it's probably possible to optimize this
-                  //     let release = (0..trace.len())
-                  //         .find(|t| children.0.eval(&trace[*t..]))
-                  //         .unwrap_or(trace.len());
-                  //     (0..=release).all(|t| children.1.eval(&trace[t..]))
-                  // }
-                  // BinaryOp::ReleaseLeq(time) => {
-                  //     let release = (0..=time as usize)
-                  //         .find(|t| children.0.eval(&trace[(*t).min(trace.len())..]))
-                  //         .unwrap_or(time as usize);
-                  //     (0..=release).all(|t| children.1.eval(&trace[t.min(trace.len())..]))
-                  // }
-                  // BinaryOp::ReleaseGneq(time) => {
-                  //     let release = (time as usize + 1..trace.len())
-                  //         .find(|t| children.0.eval(&trace[(*t).min(trace.len())..]))
-                  //         .unwrap_or(trace.len());
-                  //     (time as usize + 1..=release)
-                  //         .all(|t| children.1.eval(&trace[t.min(trace.len())..]))
-                  // }
-                  // BinaryOp::UntillLeq(time) => {
-                  //     let until = (0..=time as usize)
-                  //         .find(|t| children.1.eval(&trace[(*t).min(trace.len())..]))
-                  //         .unwrap_or(time as usize + 1);
-                  //     (0..until).all(|t| children.0.eval(&trace[t.min(trace.len())..]))
-                  // }
+                }
             },
         }
     }
@@ -225,48 +188,6 @@ mod eval {
         assert!(!formula.eval(&trace));
     }
 
-    // #[test]
-    // fn globally_leq() {
-    //     let formula = SyntaxTree::Unary {
-    //         op: UnaryOp::GloballyLeq(1),
-    //         child: Arc::new(ATOM_0),
-    //     };
-
-    //     let trace = [[true], [true], [false]];
-    //     assert!(formula.eval(&trace));
-
-    //     let trace = [[true], [false], [true]];
-    //     assert!(!formula.eval(&trace));
-    // }
-
-    // #[test]
-    // fn globally_gneq() {
-    //     let formula = SyntaxTree::Unary {
-    //         op: UnaryOp::GloballyGneq(0),
-    //         child: Arc::new(ATOM_0),
-    //     };
-
-    //     let trace = [[false], [true], [true]];
-    //     assert!(formula.eval(&trace));
-
-    //     let trace = [[true], [false], [true]];
-    //     assert!(!formula.eval(&trace));
-    // }
-
-    // #[test]
-    // fn finally_leq() {
-    //     let formula = SyntaxTree::Unary {
-    //         op: UnaryOp::FinallyLeq(1),
-    //         child: Arc::new(ATOM_0),
-    //     };
-
-    //     let trace = [[false], [true], [false]];
-    //     assert!(formula.eval(&trace));
-
-    //     let trace = [[false], [false], [true]];
-    //     assert!(!formula.eval(&trace));
-    // }
-
     #[test]
     fn and() {
         let formula = SyntaxTree::Binary {
@@ -308,67 +229,4 @@ mod eval {
         let trace = [[true, false], [true, false], [false, false]];
         assert!(!formula.eval(&trace));
     }
-
-    // #[test]
-    // fn release() {
-    //     let formula = SyntaxTree::Binary {
-    //         op: BinaryOp::Release,
-    //         children.0: Arc::new(ATOM_0),
-    //         children.1: Arc::new(ATOM_1),
-    //     };
-
-    //     let trace = [[false, true], [true, true], [false, false]];
-    //     assert!(formula.eval(&trace));
-
-    //     let trace = [[false, true], [true, false], [false, true]];
-    //     assert!(!formula.eval(&trace));
-    // }
-
-    // #[test]
-    // fn release_leq() {
-    //     let formula = SyntaxTree::Binary {
-    //         op: BinaryOp::ReleaseLeq(1),
-    //         children.0: Arc::new(ATOM_0),
-    //         children.1: Arc::new(ATOM_1),
-    //     };
-
-    //     let trace = [[false, true], [false, true], [false, false]];
-    //     assert!(formula.eval(&trace));
-
-    //     let trace = [[false, true], [true, false], [false, false]];
-    //     assert!(!formula.eval(&trace));
-    // }
-
-    // #[test]
-    // fn release_gneq() {
-    //     let formula = SyntaxTree::Binary {
-    //         op: BinaryOp::ReleaseGneq(0),
-    //         children.0: Arc::new(ATOM_0),
-    //         children.1: Arc::new(ATOM_1),
-    //     };
-
-    //     let trace = [[false, false], [false, true], [true, true], [false, false]];
-    //     assert!(formula.eval(&trace));
-
-    //     let trace = [[true, true], [false, true], [true, false], [false, false]];
-    //     assert!(!formula.eval(&trace));
-    // }
-
-    // #[test]
-    // fn until_leq() {
-    //     let formula = SyntaxTree::Binary {
-    //         op: BinaryOp::UntillLeq(1),
-    //         children.0: Arc::new(ATOM_0),
-    //         children.1: Arc::new(ATOM_1),
-    //     };
-
-    //     let trace = [[true, false], [false, true], [false, false]];
-    //     assert!(formula.eval(&trace));
-
-    //     let trace = [[true, false], [true, false], [false, false]];
-    //     assert!(formula.eval(&trace));
-
-    //     let trace = [[true, false], [false, false]];
-    //     assert!(!formula.eval(&trace));
-    // }
 }

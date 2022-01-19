@@ -4,6 +4,7 @@ use itertools::Itertools;
 
 use std::sync::Arc;
 
+/// A tree structure with unary and binary nodes, but containing no data.
 #[derive(Debug, Clone)]
 enum SkeletonTree {
     Leaf,
@@ -12,6 +13,8 @@ enum SkeletonTree {
 }
 
 impl SkeletonTree {
+    /// Generates all possible `SkeletonTree`s of the given size,
+    /// where the size is given by the number of leaves.
     fn gen(size: usize) -> Vec<SkeletonTree> {
         match size {
             0 => panic!("No tree of size 0"),
@@ -38,13 +41,23 @@ impl SkeletonTree {
         }
     }
 
+    /// Generates all possible LTL formulae whose structure fits that of the `SkeletonTree`,
+    /// in the sense that leaves of the `SkeletonTree` correspond to propositional variables,
+    /// unary nodes of the `SkeletonTree` correspond to unary operators of LTL,
+    /// and binary nodes of the `SkeletonTree` correspond to binary operators of LTL.
+    /// After being generated, a formula is checked under filtering criteria,
+    /// and discarded if found to be equivalent to other formulae that have been or will included anyway.
+    /// The const generic N represents the set of propositional variables which might appear in the generated formulae.
     fn gen_formulae<const N: usize>(&self) -> Vec<SyntaxTree> {
         match self {
+            // Leaves of the `SkeletonTree` correspond to propositional variables
             SkeletonTree::Leaf => (0..N)
                 .map(|n| SyntaxTree::Atom(n as Idx))
                 .collect::<Vec<SyntaxTree>>(),
+            // Unary nodes of the `SkeletonTree` correspond to unary operators of LTL
             SkeletonTree::UnaryNode(child) => {
                 let children = child.gen_formulae::<N>();
+                // Use known bounds to allocate just as much memory as needed and avoid reallocations.
                 let mut trees = Vec::with_capacity(4 * children.len());
 
                 for child in children {
@@ -83,9 +96,11 @@ impl SkeletonTree {
 
                 trees
             }
+            // Binary nodes of the `SkeletonTree` correspond to binary operators of LTL
             SkeletonTree::BinaryNode(child) => {
                 let left_children = child.0.gen_formulae::<N>();
                 let right_children = child.1.gen_formulae::<N>();
+                // Use known bounds to allocate just as much memory as needed and avoid reallocations.
                 let mut trees = Vec::with_capacity(4 * left_children.len() * right_children.len());
                 let children = left_children
                     .into_iter()
@@ -131,18 +146,8 @@ impl SkeletonTree {
     }
 }
 
-// pub fn brute_solve<const N: usize>(sample: &Sample<N>, log: bool) -> Option<SyntaxTree> {
-//     (1..).into_iter().find_map(|size| {
-//         if log {
-//             println!("Searching formulae of size {}", size);
-//         }
-//         SkeletonTree::gen(size)
-//             .into_iter()
-//             .flat_map(|skeleton| skeleton.gen_formulae::<N>())
-//             .find(|formula| sample.is_consistent(formula))
-//     })
-// }
-
+/// Find a formula consistent with the given `Sample`.
+/// Uses a fundamentally brute-force search algorithm.
 // Parallel search is faster but less consistent then single-threaded search
 pub fn par_brute_solve<const N: usize>(sample: &Sample<N>, log: bool) -> Option<SyntaxTree> {
     use rayon::prelude::*;
@@ -151,7 +156,8 @@ pub fn par_brute_solve<const N: usize>(sample: &Sample<N>, log: bool) -> Option<
         if log {
             println!("Searching formulae of size {}", size);
         }
-        // At small size, the overhead is not worth it.
+        // At small size, the overhead for parallel iterators is not worth it.
+        // At larger size, we use parallel iterators for speed.
         if size < 6 {
             SkeletonTree::gen(size)
                 .into_iter()
@@ -160,8 +166,6 @@ pub fn par_brute_solve<const N: usize>(sample: &Sample<N>, log: bool) -> Option<
         } else {
             SkeletonTree::gen(size)
                 .into_par_iter()
-                // .flat_map_iter(|skeleton| skeleton.gen_formulae::<N>())
-                // .find_map_any(|skeleton| skeleton.gen_formulae::<N>().into_iter().find(|formula| sample.is_consistent(formula)))
                 .flat_map(|skeleton| skeleton.gen_formulae::<N>())
                 .find_any(|formula| sample.is_consistent(formula))
         }
