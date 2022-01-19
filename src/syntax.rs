@@ -32,6 +32,7 @@ impl fmt::Display for UnaryOp {
 #[derive(Debug, Clone, Copy, PartialOrd, Ord, PartialEq, Eq, Deserialize)]
 pub enum BinaryOp {
     And,
+    XOr,
     Or,
     Implies,
     Until,
@@ -46,6 +47,7 @@ impl fmt::Display for BinaryOp {
         match *self {
             BinaryOp::And => write!(f, "∧"),
             BinaryOp::Or => write!(f, "v"),
+            BinaryOp::XOr => write!(f, "+"),
             BinaryOp::Implies => write!(f, "→"),
             BinaryOp::Until => write!(f, "U"),
             // BinaryOp::Release => write!(f, "R"),
@@ -59,6 +61,7 @@ impl fmt::Display for BinaryOp {
 #[derive(Debug, Clone, PartialOrd, Ord, PartialEq, Eq, Deserialize)]
 pub enum SyntaxTree {
     Atom(Idx),
+    Zeroary(bool),
     Unary {
         op: UnaryOp,
         child: Arc<SyntaxTree>,
@@ -73,6 +76,8 @@ impl fmt::Display for SyntaxTree {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             SyntaxTree::Atom(var) => write!(f, "x{}", var),
+            SyntaxTree::Zeroary(true) => write!(f, "T"),
+            SyntaxTree::Zeroary(false) => write!(f, "F"),
             SyntaxTree::Unary { op, child } => write!(f, "{}({})", op, child),
             SyntaxTree::Binary { op, children } => {
                 write!(f, "({}){}({})", children.0, op, children.1)
@@ -85,6 +90,7 @@ impl SyntaxTree {
     pub fn vars(&self) -> Idx {
         match self {
             SyntaxTree::Atom(n) => *n + 1,
+            SyntaxTree::Zeroary(_) => 0,
             SyntaxTree::Unary { child, .. } => child.as_ref().vars(),
             SyntaxTree::Binary { children, .. } => children.0.vars().max(children.1.vars()),
         }
@@ -100,6 +106,7 @@ impl SyntaxTree {
                 })
                 .cloned()
                 .unwrap_or(false),
+            SyntaxTree::Zeroary(boolean) => *boolean,
             SyntaxTree::Unary { op, child } => match *op {
                 UnaryOp::Not => !child.eval(trace),
                 UnaryOp::Next => {
@@ -124,6 +131,7 @@ impl SyntaxTree {
             SyntaxTree::Binary { op, children } => match *op {
                 BinaryOp::And => children.0.eval(trace) && children.1.eval(trace),
                 BinaryOp::Or => children.0.eval(trace) || children.1.eval(trace),
+                BinaryOp::XOr => children.0.eval(trace) != children.1.eval(trace) ,
                 BinaryOp::Implies => !children.0.eval(trace) || children.1.eval(trace),
                 BinaryOp::Until => {
                     for t in 0..trace.len() {

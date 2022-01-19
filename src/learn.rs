@@ -2,6 +2,7 @@ use crate::syntax::*;
 use crate::trace::*;
 use itertools::Itertools;
 
+use std::fmt::Binary;
 use std::sync::Arc;
 
 #[derive(Debug, Clone)]
@@ -472,5 +473,37 @@ fn check_until((left_child, right_child): &(SyntaxTree, SyntaxTree)) -> bool {
             _ => true,
         }
 }
+
+
+// Assumes subformulas are reduced too
+fn reduced(formula: &SyntaxTree) -> bool {
+    match formula {
+        SyntaxTree::Binary { op: BinaryOp::XOr , children } => match children.as_ref() {
+            // 0 + x -> x
+            (SyntaxTree::Zeroary(false), _) => false,
+            // x + 0 -> x
+            (_, SyntaxTree::Zeroary(false)) => false,
+            // x + x -> 0
+            // HARD: x could be any subformula of left- and right-hand-side!
+            (left_child, right_child) => {
+                let right_xor_terms = list_xor_terms(right_child);
+                !list_xor_terms(left_child).iter().any(|xor_term| right_xor_terms.contains(xor_term))
+            }
+        }
+        _ => true,
+    }
+}
+
+fn list_xor_terms(formula: &SyntaxTree) -> Vec<&SyntaxTree> {
+    if let SyntaxTree::Binary { op: BinaryOp::XOr, children } = formula {
+        let (left_child, right_child) = children.as_ref();
+        let mut left_terms = list_xor_terms(left_child);
+        left_terms.append(&mut list_xor_terms(right_child));
+        left_terms
+    } else {
+        vec![formula]
+    }
+}
+
 
 // TODO: write tests for checks
