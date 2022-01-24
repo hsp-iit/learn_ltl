@@ -177,7 +177,9 @@ fn check_not(child: &SyntaxTree) -> bool {
         // ¬¬φ ≡ φ
         SyntaxTree::Unary { op: UnaryOp::Not, .. }
         // ¬(φ -> ψ) ≡ φ ∧ ¬ψ
-        | SyntaxTree::Binary { op: BinaryOp::Implies, .. } => false,
+        | SyntaxTree::Binary { op: BinaryOp::Implies, .. }
+        // ¬ F φ ≡ G ¬ φ
+        | SyntaxTree::Unary { op: UnaryOp::Finally, .. } => false,
         // ¬(¬φ ∨ ψ) ≡ φ ∧ ¬ψ
         SyntaxTree::Binary { op: BinaryOp::Or, children }
         // ¬(¬φ ∧ ψ) ≡ φ ∨ ¬ψ
@@ -194,35 +196,36 @@ fn check_next(child: &SyntaxTree) -> bool {
     !matches!(
         child,
         // ¬ X φ ≡ X ¬ φ
+        // X G φ ≡ G X φ
+        // X F φ ≡ F X φ
         SyntaxTree::Unary {
-            op: UnaryOp::Next,
+            op: UnaryOp::Not | UnaryOp::Globally | UnaryOp::Finally,
             ..
-        } // // X False ≡ False
-          // | SyntaxTree::Zeroary { op: ZeroaryOp::False }
+        }
     )
 }
 
 fn check_globally(child: &SyntaxTree) -> bool {
     !matches!(
         child,
-        // G G φ <=> G φ
+        // G G φ ≡ G φ
         SyntaxTree::Unary { op: UnaryOp::Globally, .. }
-        // X G φ ≡ G X φ
-        | SyntaxTree::Unary { op: UnaryOp::Next, .. }
-        // ¬ F φ ≡ G ¬ φ
-        | SyntaxTree::Unary { op: UnaryOp::Finally, .. } // // G False ≡ False
-                                                         // | SyntaxTree::Zeroary { op: ZeroaryOp::False }
+        // // X G φ ≡ G X φ
+        // | SyntaxTree::Unary { op: UnaryOp::Next, .. }
+        // // G False ≡ False
+        // | SyntaxTree::Zeroary { op: ZeroaryOp::False }
     )
 }
 
 fn check_finally(child: &SyntaxTree) -> bool {
     !matches!(
         child,
-        // F F φ <=> F φ
+        // F F φ ≡ F φ
         SyntaxTree::Unary { op: UnaryOp::Finally, .. }
-        // X F φ ≡ F X φ
-        | SyntaxTree::Unary { op: UnaryOp::Globally, .. } // // F False ≡ False
-                                                          // | SyntaxTree::Zeroary { op: ZeroaryOp::False }
+        // // X F φ ≡ F X φ
+        // | SyntaxTree::Unary { op: UnaryOp::Next, .. }
+        // // F False ≡ False
+        // | SyntaxTree::Zeroary { op: ZeroaryOp::False }
     )
 }
 
