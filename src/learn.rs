@@ -431,12 +431,20 @@ fn check_implies((left_child, right_child): &(SyntaxTree, SyntaxTree)) -> bool {
         // // φ -> ψ ≡ ¬ψ -> ¬φ // subsumed by following rule
         // (SyntaxTree::Unary { op: UnaryOp::Not, .. }, SyntaxTree::Unary { op: UnaryOp::Not, .. }) => false,
         // ¬φ -> ψ ≡ ψ ∨ φ
-        | (
+        (
             SyntaxTree::Unary {
                 op: UnaryOp::Not,
                 ..
             },
-            ..,
+            _,
+        )
+        // φ_1 -> (φ_2 -> ψ) ≡ (φ_1 ∧ φ_2) -> ψ
+        | (
+            _,
+            SyntaxTree::Binary {
+                op: BinaryOp::Implies,
+                ..
+            },
         )
     )
 }
