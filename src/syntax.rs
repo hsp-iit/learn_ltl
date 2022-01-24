@@ -6,10 +6,10 @@ pub type Idx = u8;
 
 #[derive(Debug, Clone, Copy, PartialOrd, Ord, PartialEq, Eq, Deserialize)]
 pub enum UnaryOp {
-    Not,
+    // Not,
     Next,
-    Globally,
-    Finally,
+    // Globally,
+    // Finally,
     // GloballyLeq(Time),
     // GloballyGneq(Time),
     // FinallyLeq(Time),
@@ -19,12 +19,12 @@ impl fmt::Display for UnaryOp {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match *self {
             // UnaryOp::FinallyLeq(n) => write!(f, "F≤{}", n),
-            UnaryOp::Globally => write!(f, "G"),
-            UnaryOp::Finally => write!(f, "F"),
+            // UnaryOp::Globally => write!(f, "G"),
+            // UnaryOp::Finally => write!(f, "F"),
             // UnaryOp::GloballyGneq(n) => write!(f, "G>{}", n),
             // UnaryOp::GloballyLeq(n) => write!(f, "G≤{}", n),
             UnaryOp::Next => write!(f, "X"),
-            UnaryOp::Not => write!(f, "¬"),
+            // UnaryOp::Not => write!(f, "¬"),
         }
     }
 }
@@ -33,8 +33,8 @@ impl fmt::Display for UnaryOp {
 pub enum BinaryOp {
     And,
     XOr,
-    Or,
-    Implies,
+    // Or,
+    // Implies,
     Until,
     // Release,
     // ReleaseLeq(Time),
@@ -46,9 +46,9 @@ impl fmt::Display for BinaryOp {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match *self {
             BinaryOp::And => write!(f, "∧"),
-            BinaryOp::Or => write!(f, "v"),
+            // BinaryOp::Or => write!(f, "v"),
             BinaryOp::XOr => write!(f, "+"),
-            BinaryOp::Implies => write!(f, "→"),
+            // BinaryOp::Implies => write!(f, "→"),
             BinaryOp::Until => write!(f, "U"),
             // BinaryOp::Release => write!(f, "R"),
             // BinaryOp::ReleaseGneq(t) => write!(f, "R>{}", t),
@@ -108,7 +108,7 @@ impl SyntaxTree {
                 .unwrap_or(false),
             SyntaxTree::Zeroary(boolean) => *boolean,
             SyntaxTree::Unary { op, child } => match *op {
-                UnaryOp::Not => !child.eval(trace),
+                // UnaryOp::Not => !child.eval(trace),
                 UnaryOp::Next => {
                     if trace.is_empty() {
                         false
@@ -116,8 +116,8 @@ impl SyntaxTree {
                         child.eval(&trace[1..])
                     }
                 }
-                UnaryOp::Globally => (0..trace.len()).all(|t| child.eval(&trace[t..])),
-                UnaryOp::Finally => (0..trace.len()).any(|t| child.eval(&trace[t..])),
+                // UnaryOp::Globally => (0..trace.len()).all(|t| child.eval(&trace[t..])),
+                // UnaryOp::Finally => (0..trace.len()).any(|t| child.eval(&trace[t..])),
                 // UnaryOp::GloballyLeq(time) => {
                 //     (0..(time as usize + 1).min(trace.len())).all(|t| child.eval(&trace[t..]))
                 // }
@@ -130,9 +130,9 @@ impl SyntaxTree {
             },
             SyntaxTree::Binary { op, children } => match *op {
                 BinaryOp::And => children.0.eval(trace) && children.1.eval(trace),
-                BinaryOp::Or => children.0.eval(trace) || children.1.eval(trace),
+                // BinaryOp::Or => children.0.eval(trace) || children.1.eval(trace),
                 BinaryOp::XOr => children.0.eval(trace) != children.1.eval(trace) ,
-                BinaryOp::Implies => !children.0.eval(trace) || children.1.eval(trace),
+                // BinaryOp::Implies => !children.0.eval(trace) || children.1.eval(trace),
                 BinaryOp::Until => {
                     for t in 0..trace.len() {
                         let t_trace = &trace[t..];
@@ -191,19 +191,19 @@ mod eval {
         assert!(!ATOM_0.eval(&trace));
     }
 
-    #[test]
-    fn not() {
-        let formula = SyntaxTree::Unary {
-            op: UnaryOp::Not,
-            child: Arc::new(ATOM_0),
-        };
+    // #[test]
+    // fn not() {
+    //     let formula = SyntaxTree::Unary {
+    //         op: UnaryOp::Not,
+    //         child: Arc::new(ATOM_0),
+    //     };
 
-        let trace = [[false]];
-        assert!(formula.eval(&trace));
+    //     let trace = [[false]];
+    //     assert!(formula.eval(&trace));
 
-        let trace = [[true]];
-        assert!(!formula.eval(&trace));
-    }
+    //     let trace = [[true]];
+    //     assert!(!formula.eval(&trace));
+    // }
 
     #[test]
     fn next() {
@@ -219,19 +219,19 @@ mod eval {
         assert!(!formula.eval(&trace));
     }
 
-    #[test]
-    fn globally() {
-        let formula = SyntaxTree::Unary {
-            op: UnaryOp::Globally,
-            child: Arc::new(ATOM_0),
-        };
+    // #[test]
+    // fn globally() {
+    //     let formula = SyntaxTree::Unary {
+    //         op: UnaryOp::Globally,
+    //         child: Arc::new(ATOM_0),
+    //     };
 
-        let trace = [[true], [true], [true]];
-        assert!(formula.eval(&trace));
+    //     let trace = [[true], [true], [true]];
+    //     assert!(formula.eval(&trace));
 
-        let trace = [[true], [false], [true]];
-        assert!(!formula.eval(&trace));
-    }
+    //     let trace = [[true], [false], [true]];
+    //     assert!(!formula.eval(&trace));
+    // }
 
     // #[test]
     // fn globally_leq() {
@@ -289,19 +289,19 @@ mod eval {
         assert!(!formula.eval(&trace));
     }
 
-    #[test]
-    fn or() {
-        let formula = SyntaxTree::Binary {
-            op: BinaryOp::Or,
-            children: Arc::new((ATOM_0, ATOM_1)),
-        };
+    // #[test]
+    // fn or() {
+    //     let formula = SyntaxTree::Binary {
+    //         op: BinaryOp::Or,
+    //         children: Arc::new((ATOM_0, ATOM_1)),
+    //     };
 
-        let trace = [[true, false]];
-        assert!(formula.eval(&trace));
+    //     let trace = [[true, false]];
+    //     assert!(formula.eval(&trace));
 
-        let trace = [[false, false]];
-        assert!(!formula.eval(&trace));
-    }
+    //     let trace = [[false, false]];
+    //     assert!(!formula.eval(&trace));
+    // }
 
     #[test]
     fn until() {
