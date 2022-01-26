@@ -202,7 +202,11 @@ fn check_next(child: &SyntaxTree) -> bool {
     !matches!(
         child,
         // X False ≡ False, X True ≡ True
-        | SyntaxTree::Zeroary(_)
+        SyntaxTree::Zeroary(_)
+        // X (x + y) -> Xx + Xy
+        // X (x /\ y) -> Xx /\ Xy
+        // X (x U y) -> Xx U Xy
+        | SyntaxTree::Binary { op: BinaryOp::And | BinaryOp::XOr | BinaryOp::Until, .. }
     )
 }
 
@@ -235,27 +239,27 @@ fn check_and((left_child, right_child): &(SyntaxTree, SyntaxTree)) -> bool {
     left_child < right_child
         && match (left_child, right_child) {
         // 0 /\ x -> 0, 1 /\ x -> x
-        (SyntaxTree::Zeroary(_), _) => false,
+        (SyntaxTree::Zeroary(_), _)
         // x /\ 0 -> 0, x /\ 1 -> x
-        (_, SyntaxTree::Zeroary(_)) => false,
+        | (_, SyntaxTree::Zeroary(_))
         // //  Excluded middle
         // (child, SyntaxTree::Unary { op: UnaryOp::Not, child: neg_child })
         // |(SyntaxTree::Unary { op: UnaryOp::Not, child: neg_child }, child) if child == neg_child.as_ref() => false,
         // // // Domination law
         // // (.., SyntaxTree::Zeroary { op: ZeroaryOp::False })
         // // | (SyntaxTree::Zeroary { op: ZeroaryOp::False }, ..)
-        // // Associative laws
-        // | (SyntaxTree::Binary { op: BinaryOp::And, .. }, ..)
+        // Associative laws
+        | (SyntaxTree::Binary { op: BinaryOp::And, .. }, ..) => false,
         // // De Morgan's laws
         // | (SyntaxTree::Unary { op: UnaryOp::Not, .. }, SyntaxTree::Unary { op: UnaryOp::Not, .. })
-        // X (φ ∧ ψ) ≡ (X φ) ∧ (X ψ)
-        (SyntaxTree::Unary { op: UnaryOp::Next, .. }, SyntaxTree::Unary { op: UnaryOp::Next, .. }) => false,
+        // // X (φ ∧ ψ) ≡ (X φ) ∧ (X ψ)
+        // | (SyntaxTree::Unary { op: UnaryOp::Next, .. }, SyntaxTree::Unary { op: UnaryOp::Next, .. }) => false,
         // // G (φ ∧ ψ)≡ (G φ) ∧ (G ψ)
         // | (SyntaxTree::Unary { op: UnaryOp::Globally, .. }, SyntaxTree::Unary { op: UnaryOp::Globally, .. }) => false,
         // // (φ -> ψ_1) ∧ (φ -> ψ_2) ≡ φ -> (ψ_1 ∧ ψ_2)
         // // (φ_1 -> ψ) ∧ (φ_2 -> ψ) ≡ (φ_1 ∨ φ_2) -> ψ
         // (SyntaxTree::Binary { op: BinaryOp::Implies, children: c_1 }, SyntaxTree::Binary { op: BinaryOp::Implies, children: c_2 }) if c_1.0 == c_2.0 || c_1.1 == c_2.1 => false,
-        // // (φ_1 U ψ) ∧ (φ_2 U ψ) ≡ (φ_1 ∧ φ_2) U ψleft_child: l_1
+        // // (φ_1 U ψ) ∧ (φ_2 U ψ) ≡ (φ_1 ∧ φ_2) U ψ left_child: l_1
         // (SyntaxTree::Binary { op: BinaryOp::Until, children: c_1 }, SyntaxTree::Binary { op: BinaryOp::Until, children: c_2, .. }) if c_1.1 == c_2.1 => false,
         // // Absorption laws
         // (SyntaxTree::Binary { op: BinaryOp::Or, children: c_1 }, right_child) if c_1.0 == *right_child || c_1.1 == *right_child => false,
@@ -286,17 +290,16 @@ fn check_and((left_child, right_child): &(SyntaxTree, SyntaxTree)) -> bool {
         // } else {
         //     true
         // },
-        // (left_child, right_child) => {
-        //     // x /\ (y + z) -> x + y /\ x + z
-        //     if let SyntaxTree::Binary { op: BinaryOp::XOr, .. } = left_child {
-        //         return false;
-        //     }
-        //     // x /\ x -> x
-        //     // HARD: x could be any subformula of left- and right-hand-side!
-        //     let right_and_terms = list_and_terms(right_child);
-        //     !list_and_terms(left_child).iter().any(|and_term| right_and_terms.contains(and_term))
-        // }
-        _ => true,
+        _ => {
+            // x /\ (y + z) -> x + y /\ x + z
+            if let SyntaxTree::Binary { op: BinaryOp::XOr, .. } = left_child {
+                return false;
+            }
+            // x /\ x -> x
+            // HARD: x could be any subformula of left- and right-hand-side!
+            let right_and_terms = list_and_terms(right_child);
+            !list_and_terms(left_child).iter().any(|and_term| right_and_terms.contains(and_term))
+        }
     }
 }
 
@@ -499,10 +502,12 @@ fn check_xor((left_child, right_child): &(SyntaxTree, SyntaxTree)) -> bool {
     left_child < right_child
         && match (left_child, right_child) {
         // 0 + x -> x
-        (SyntaxTree::Zeroary(false), _) => false,
+        (SyntaxTree::Zeroary(false), _)
         // x + 0 -> x
-        (_, SyntaxTree::Zeroary(false)) => false,
-        (left_child, right_child) => {
+        | (_, SyntaxTree::Zeroary(false))
+        // Associative laws
+        | (SyntaxTree::Binary { op: BinaryOp::XOr, .. }, ..) => false,
+        _ => {
             // x + x -> 0
             // HARD: x could be any subformula of left- and right-hand-side!
             let right_xor_terms = list_xor_terms(right_child);
