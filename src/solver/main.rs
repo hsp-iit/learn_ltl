@@ -88,6 +88,62 @@ fn load_and_solve(contents: Vec<u8>) -> Option<SyntaxTree> {
                 .map(|sample| par_brute_solve(&sample, true)),
             10 => ron::de::from_bytes::<Sample<10>>(&contents)
                 .map(|sample| par_brute_solve(&sample, true)),
+            11 => ron::de::from_bytes::<Sample<11>>(&contents)
+                .map(|sample| par_brute_solve(&sample, true)),
+            12 => ron::de::from_bytes::<Sample<12>>(&contents)
+                .map(|sample| par_brute_solve(&sample, true)),
+            13 => ron::de::from_bytes::<Sample<13>>(&contents)
+                .map(|sample| par_brute_solve(&sample, true)),
+            14 => ron::de::from_bytes::<Sample<14>>(&contents)
+                .map(|sample| par_brute_solve(&sample, true)),
+            15 => ron::de::from_bytes::<Sample<15>>(&contents)
+                .map(|sample| par_brute_solve(&sample, true)),
+            16 => ron::de::from_bytes::<Sample<16>>(&contents)
+                .map(|sample| par_brute_solve(&sample, true)),
+            17 => ron::de::from_bytes::<Sample<17>>(&contents)
+                .map(|sample| par_brute_solve(&sample, true)),
+            18 => ron::de::from_bytes::<Sample<18>>(&contents)
+                .map(|sample| par_brute_solve(&sample, true)),
+            19 => ron::de::from_bytes::<Sample<19>>(&contents)
+                .map(|sample| par_brute_solve(&sample, true)),
+            20 => ron::de::from_bytes::<Sample<20>>(&contents)
+                .map(|sample| par_brute_solve(&sample, true)),
+            21 => ron::de::from_bytes::<Sample<21>>(&contents)
+                .map(|sample| par_brute_solve(&sample, true)),
+            22 => ron::de::from_bytes::<Sample<22>>(&contents)
+                .map(|sample| par_brute_solve(&sample, true)),
+            23 => ron::de::from_bytes::<Sample<23>>(&contents)
+                .map(|sample| par_brute_solve(&sample, true)),
+            24 => ron::de::from_bytes::<Sample<24>>(&contents)
+                .map(|sample| par_brute_solve(&sample, true)),
+            25 => ron::de::from_bytes::<Sample<25>>(&contents)
+                .map(|sample| par_brute_solve(&sample, true)),
+            26 => ron::de::from_bytes::<Sample<26>>(&contents)
+                .map(|sample| par_brute_solve(&sample, true)),
+            27 => ron::de::from_bytes::<Sample<27>>(&contents)
+                .map(|sample| par_brute_solve(&sample, true)),
+            28 => ron::de::from_bytes::<Sample<28>>(&contents)
+                .map(|sample| par_brute_solve(&sample, true)),
+            29 => ron::de::from_bytes::<Sample<29>>(&contents)
+                .map(|sample| par_brute_solve(&sample, true)),
+            30 => ron::de::from_bytes::<Sample<30>>(&contents)
+                .map(|sample| par_brute_solve(&sample, true)),
+            31 => ron::de::from_bytes::<Sample<31>>(&contents)
+                .map(|sample| par_brute_solve(&sample, true)),
+            32 => ron::de::from_bytes::<Sample<32>>(&contents)
+                .map(|sample| par_brute_solve(&sample, true)),
+            33 => ron::de::from_bytes::<Sample<33>>(&contents)
+                .map(|sample| par_brute_solve(&sample, true)),
+            34 => ron::de::from_bytes::<Sample<34>>(&contents)
+                .map(|sample| par_brute_solve(&sample, true)),
+            35 => ron::de::from_bytes::<Sample<35>>(&contents)
+                .map(|sample| par_brute_solve(&sample, true)),
+            36 => ron::de::from_bytes::<Sample<36>>(&contents)
+                .map(|sample| par_brute_solve(&sample, true)),
+            37 => ron::de::from_bytes::<Sample<37>>(&contents)
+                .map(|sample| par_brute_solve(&sample, true)),
+            38 => ron::de::from_bytes::<Sample<38>>(&contents)
+                .map(|sample| par_brute_solve(&sample, true)),
             _ => panic!("out-of-bound parameter"),
         }
         .ok()

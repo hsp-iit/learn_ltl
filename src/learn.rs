@@ -209,11 +209,13 @@ fn check_globally(child: &SyntaxTree) -> bool {
     !matches!(
         child,
         // G G φ ≡ G φ
-        SyntaxTree::Unary { op: UnaryOp::Globally, .. }
-        // // X G φ ≡ G X φ
-        // | SyntaxTree::Unary { op: UnaryOp::Next, .. }
-        // // G False ≡ False
-        // | SyntaxTree::Zeroary { op: ZeroaryOp::False }
+        SyntaxTree::Unary {
+            op: UnaryOp::Globally,
+            ..
+        } // // X G φ ≡ G X φ
+          // | SyntaxTree::Unary { op: UnaryOp::Next, .. }
+          // // G False ≡ False
+          // | SyntaxTree::Zeroary { op: ZeroaryOp::False }
     )
 }
 
@@ -221,11 +223,13 @@ fn check_finally(child: &SyntaxTree) -> bool {
     !matches!(
         child,
         // F F φ ≡ F φ
-        SyntaxTree::Unary { op: UnaryOp::Finally, .. }
-        // // X F φ ≡ F X φ
-        // | SyntaxTree::Unary { op: UnaryOp::Next, .. }
-        // // F False ≡ False
-        // | SyntaxTree::Zeroary { op: ZeroaryOp::False }
+        SyntaxTree::Unary {
+            op: UnaryOp::Finally,
+            ..
+        } // // X F φ ≡ F X φ
+          // | SyntaxTree::Unary { op: UnaryOp::Next, .. }
+          // // F False ≡ False
+          // | SyntaxTree::Zeroary { op: ZeroaryOp::False }
     )
 }
 
