@@ -122,7 +122,8 @@ impl SyntaxTree {
                             return false;
                         }
                     }
-                    true
+                    // Until is not satisfied if its right-hand-side argument never becomes true.
+                    false
                 }
             },
         }
@@ -227,6 +228,10 @@ mod eval {
         assert!(formula.eval(&trace));
 
         let trace = [[true, false], [true, false], [false, false]];
+        assert!(!formula.eval(&trace));
+
+        // Until is not satisfied if its right-hand-side argument never becomes true.
+        let trace = [[true, false], [true, false], [true, false]];
         assert!(!formula.eval(&trace));
     }
 }
