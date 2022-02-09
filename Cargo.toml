@@ -19,6 +19,9 @@ path = "src/sampler/main.rs"
 name = "sample"
 harness = false
 
+[workspace]
+members = ["./simulator"]
+
 # [profile.release]
 # lto = true
 # debug = true

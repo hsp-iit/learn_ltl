@@ -1,0 +1,12 @@
+[package]
+name = "simulator"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+learn_pltl_fast = {path = "../"}
+petgraph = "0.6.*"
+rand = "0.8.*"
+ron = "0.7.*"
