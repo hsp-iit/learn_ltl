@@ -5,7 +5,7 @@ use serde_with::*;
 pub type Trace<const N: usize> = Vec<[bool; N]>;
 
 #[serde_as]
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Default, Serialize, Deserialize)]
 pub struct Sample<const N: usize> {
     #[serde_as(as = "Vec<Vec<[_; N]>>")]
     pub positive_traces: Vec<Trace<N>>,
@@ -42,6 +42,28 @@ impl<const N: usize> Sample<N> {
             .max()
             .unwrap_or(0);
         positive_lenght.max(negative_lenght) as Time
+    }
+
+    pub fn add_positive_trace(&mut self, trace: Trace<N>) -> Result<(), ()> {
+        if !self.negative_traces.contains(&trace) {
+            if !self.positive_traces.contains(&trace) {
+                self.positive_traces.push(trace);
+            }
+            Ok(())
+        } else {
+            Err(())
+        }
+    }
+
+    pub fn add_negative_trace(&mut self, trace: Trace<N>) -> Result<(), ()> {
+        if !self.positive_traces.contains(&trace) {
+            if !self.negative_traces.contains(&trace) {
+                self.negative_traces.push(trace);
+            }
+            Ok(())
+        } else {
+            Err(())
+        }
     }
 }
 
