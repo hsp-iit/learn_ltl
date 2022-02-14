@@ -7,7 +7,6 @@ mod monitor;
 mod task;
 mod world;
 
-use ai::*;
 use monitor::*;
 use world::*;
 
@@ -21,17 +20,13 @@ fn main() {
 }
 
 fn collect_sample() -> Sample<8> {
-    let mut sample = Sample {
-        positive_traces: Vec::new(),
-        negative_traces: Vec::new(),
-    };
-    for _ in 0..100 {
+    let mut sample = Sample::default();
+    for _ in 0..500 {
         // let mut world = World::lab_scenario();
         // let mut world = World::recharging_scenario();
         // let mut world = World::proc_gen_recharging_scenario();
         // let (mut world, mut task) = World::door_scenario();
-        let (mut world, mut task) = World::proc_gen_scenario();
-        let mut ai = Ai::default();
+        let (mut world, mut task, mut ai) = World::proc_gen_scenario();
         let monitors: [Box<dyn Monitor>; 8] = [
             Box::new(BatteryLevel(0)),
             Box::new(BatteryLevel(World::MAX_CHARGE / 3)),
@@ -42,7 +37,7 @@ fn collect_sample() -> Sample<8> {
             Box::new(InRoom(Room::Kitchen)),
             Box::new(InRoom(Room::ChargingStation)),
         ];
-        let (trace, success) = world.run::<8>(&mut ai, task.as_mut(), &monitors);
+        let (trace, success) = world.run::<8>(ai.as_mut(), task.as_mut(), &monitors);
         if success {
             sample.add_positive_trace(trace).expect("add new trace");
         } else {

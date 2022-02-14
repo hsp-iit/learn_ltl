@@ -38,7 +38,17 @@ pub struct World {
 }
 
 impl World {
-    pub const MAX_CHARGE: Time = 12;
+    pub const MAX_CHARGE: Time = 10;
+
+    pub fn new(rooms: UnGraph<Room, Path>, icub_location: NodeIndex) -> World {
+        World {
+            rooms,
+            time: 0,
+            icub_location,
+            icub_charge: World::MAX_CHARGE,
+            outcome: (Action::Wait, Ok(())),
+        }
+    }
 
     pub fn running(&self) -> bool {
         self.time < 255
@@ -46,7 +56,7 @@ impl World {
 
     pub fn run<const N: usize>(
         &mut self,
-        ai: &mut Ai,
+        ai: &mut dyn Ai,
         task: &mut dyn Task,
         monitors: &[Box<dyn Monitor>; N],
     ) -> (Trace<N>, bool) {
@@ -74,11 +84,7 @@ impl World {
     pub fn execute(&mut self, action: &Action) -> Result<(), Failure> {
         self.time += 1;
         match *action {
-            Action::Wait => {
-                if self.icub_charge > 0 {
-                    self.icub_charge -= 1;
-                }
-            }
+            Action::Wait => self.icub_charge = self.icub_charge.saturating_sub(1),
             Action::Move(destination, path) => {
                 if self.rooms.edge_endpoints(path) == Some((self.icub_location, destination))
                     || self.rooms.edge_endpoints(path) == Some((destination, self.icub_location))
@@ -199,44 +205,34 @@ impl World {
         (world, Box::new(task))
     }
 
-    pub fn proc_gen_scenario() -> (Self, Box<dyn Task>) {
-        // running_cost 1-3: OK with time 255
-        // running_cost 2-3: OK with time 100
-        // running cost 2-4: Ok with MAX_CHARGE=12
+    pub fn proc_gen_scenario() -> (Self, Box<dyn Task>, Box<dyn Ai>) {
         const ROOM_TYPES: [Room; 3] = [Room::Kitchen, Room::ChargingStation, Room::Lab];
-        let mut rng = StdRng::seed_from_u64(rand::thread_rng().gen());
+        let mut rng = StdRng::from_entropy();
         let mut rooms = Graph::new_undirected();
 
-        let start = rooms.add_node(Room::Lab);
+        let start_room_type = *ROOM_TYPES.choose(&mut rng).expect("choose room type");
+        let start = rooms.add_node(start_room_type);
 
         for _ in 0..10 {
             let room_type = *ROOM_TYPES.choose(&mut rng).expect("choose room type");
-            let room = rooms.add_node(room_type);
             let other_node = rooms
                 .node_indices()
                 .choose(&mut rng)
                 .expect("choose a random node");
-            rooms.add_edge(room, other_node, Path { running_cost: rng.gen_range(1..=4), locked: false });
+            let room = rooms.add_node(room_type);
+            rooms.add_edge(room, other_node, Path { running_cost: rng.gen_range(2..=3), locked: rng.gen_bool(0.2) });
         }
 
-        let room_type = *ROOM_TYPES.choose(&mut rng).expect("choose room type");
-        let goal_room = rooms.add_node(room_type);
-        let other_node = rooms
-            .node_indices()
-            .choose(&mut rng)
-            .expect("choose a random node");
-        rooms.add_edge(goal_room, other_node, Path { running_cost: rng.gen_range(1..=4), locked: false });
+        let goal_room = rooms.node_indices().choose(&mut rng).expect("goal room");
+
         let task = ReachNode::new(goal_room);
 
-        let world = World {
-            rooms,
-            time: 0,
-            icub_location: start,
-            icub_charge: World::MAX_CHARGE,
-            outcome: (Action::Wait, Ok(())),
-        };
+        let world = World::new(rooms, start);
 
-        (world, Box::new(task))
+        // let ai = RandomAi::default();
+        let ai = AStarAi::new(goal_room);
+
+        (world, Box::new(task), Box::new(ai))
     }
 
 }
