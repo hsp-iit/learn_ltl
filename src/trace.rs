@@ -8,9 +8,9 @@ pub type Trace<const N: usize> = Vec<[bool; N]>;
 #[derive(Debug, Default, Serialize, Deserialize)]
 pub struct Sample<const N: usize> {
     #[serde_as(as = "Vec<Vec<[_; N]>>")]
-    pub positive_traces: Vec<Trace<N>>,
+    positive_traces: Vec<Trace<N>>,
     #[serde_as(as = "Vec<Vec<[_; N]>>")]
-    pub negative_traces: Vec<Trace<N>>,
+    negative_traces: Vec<Trace<N>>,
 }
 
 impl<const N: usize> Sample<N> {
@@ -64,6 +64,14 @@ impl<const N: usize> Sample<N> {
         } else {
             Err(())
         }
+    }
+
+    pub fn positive_traces(&self) -> usize {
+        self.positive_traces.len()
+    }
+
+    pub fn negative_traces(&self) -> usize {
+        self.negative_traces.len()
     }
 }
 

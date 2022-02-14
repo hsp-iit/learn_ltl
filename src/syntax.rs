@@ -114,16 +114,27 @@ impl SyntaxTree {
                 BinaryOp::Or => children.0.eval(trace) || children.1.eval(trace),
                 BinaryOp::Implies => !children.0.eval(trace) || children.1.eval(trace),
                 BinaryOp::Until => {
-                    for t in 0..trace.len() {
-                        let t_trace = &trace[t..];
-                        if children.1.eval(t_trace) {
-                            return true;
-                        } else if !children.0.eval(t_trace) {
-                            return false;
-                        }
+                    if trace.is_empty() {
+                        false
+                    } else if children.1.eval(trace) {
+                        true
+                    } else if !children.0.eval(trace) {
+                        false
+                    } else {
+                        self.eval(&trace[1..])
                     }
-                    // Until is not satisfied if its right-hand-side argument never becomes true.
-                    false
+
+                    // Seems to be slightly slower, somehow?!?
+                    // for t in 0..trace.len() {
+                    //     let t_trace = &trace[t..];
+                    //     if children.1.eval(t_trace) {
+                    //         return true;
+                    //     } else if !children.0.eval(t_trace) {
+                    //         return false;
+                    //     }
+                    // }
+                    // // Until is not satisfied if its right-hand-side argument never becomes true.
+                    // false
                 }
             },
         }

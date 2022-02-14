@@ -164,21 +164,17 @@ fn sample<const N: usize>(
     negatives: usize,
     length: usize,
 ) -> Sample<N> {
-    let mut positive_traces = Vec::new();
-    let mut negative_traces = Vec::new();
-    while positive_traces.len() < positives || negative_traces.len() < negatives {
+    let mut sample = Sample::default();
+    while sample.positive_traces() < positives || sample.negative_traces() < negatives {
         let trace = Vec::from_iter((0..length).map(|_| gen_bools()));
         let satisfaction = formula.eval(&trace);
-        if satisfaction && positive_traces.len() < positives {
-            positive_traces.push(trace);
-        } else if !satisfaction && negative_traces.len() < negatives {
-            negative_traces.push(trace);
+        if satisfaction && sample.positive_traces() < positives {
+            sample.add_positive_trace(trace).expect("add positive trace");
+        } else if !satisfaction && sample.negative_traces() < negatives {
+            sample.add_negative_trace(trace).expect("add negative trace");
         }
     }
-    Sample {
-        positive_traces,
-        negative_traces,
-    }
+    sample
 }
 
 fn gen_bools<const N: usize>() -> [bool; N] {
