@@ -1,12 +1,14 @@
 use crate::world::*;
 use petgraph::prelude::*;
+use std::fmt::Debug;
 
-pub trait Task {
+pub trait Task: Debug {
     fn success(&mut self, _world: &World) -> bool {
         false
     }
 }
 
+#[derive(Debug)]
 pub struct ReachRoom {
     room: Room,
     reached: bool,

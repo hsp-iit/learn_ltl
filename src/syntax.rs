@@ -40,7 +40,7 @@ impl fmt::Display for BinaryOp {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match *self {
             BinaryOp::And => write!(f, "∧"),
-            BinaryOp::Or => write!(f, "v"),
+            BinaryOp::Or => write!(f, "∨"),
             BinaryOp::Implies => write!(f, "→"),
             BinaryOp::Until => write!(f, "U"),
         }

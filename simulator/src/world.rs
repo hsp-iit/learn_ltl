@@ -8,27 +8,31 @@ use crate::task::*;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Room {
-    Kitchen,
+    Office,
     Lab,
     ChargingStation,
 }
 
+#[derive(Debug)]
 pub struct Path {
     pub running_cost: Time,
     pub locked: bool,
 }
 
+#[derive(Debug)]
 pub enum Action {
     Move(NodeIndex, EdgeIndex),
     Recharge,
     Wait,
 }
 
+#[derive(Debug)]
 pub enum Failure {
     DoorClosed,
     InsufficientCharge,
 }
 
+#[derive(Debug)]
 pub struct World {
     pub rooms: UnGraph<Room, Path>,
     pub time: Time,
@@ -38,7 +42,7 @@ pub struct World {
 }
 
 impl World {
-    pub const MAX_CHARGE: Time = 10;
+    pub const MAX_CHARGE: Time = 9;
 
     pub fn new(rooms: UnGraph<Room, Path>, icub_location: NodeIndex) -> World {
         World {
@@ -60,15 +64,8 @@ impl World {
         task: &mut dyn Task,
         monitors: &[Box<dyn Monitor>; N],
     ) -> (Trace<N>, bool) {
-        let mut records = [false; N];
-        for (val, monitorable) in (records.iter_mut()).zip(monitors.iter()) {
-            *val = monitorable.get(self);
-        }
-        let mut trace = vec![records];
+        let mut trace = Vec::new();
         while self.running() {
-            let action = ai.decide(self);
-            let result = self.execute(&action);
-            self.outcome = (action, result);
             let mut records = [false; N];
             for (val, monitorable) in (records.iter_mut()).zip(monitors.iter()) {
                 *val = monitorable.get(self);
@@ -77,6 +74,9 @@ impl World {
             if task.success(self) {
                 return (trace, true);
             }
+            let action = ai.decide(self);
+            let result = self.execute(&action);
+            self.outcome = (action, result);
         }
         (trace, false)
     }
@@ -118,7 +118,7 @@ impl World {
         let mut rooms = Graph::new_undirected();
         let lab_1 = rooms.add_node(Room::Lab);
         let lab_2 = rooms.add_node(Room::Lab);
-        let kitchen = rooms.add_node(Room::Kitchen);
+        let kitchen = rooms.add_node(Room::Office);
         rooms.add_edge(lab_1, lab_2, Path { running_cost: 3, locked: false });
         rooms.add_edge(lab_2, kitchen, Path { running_cost: 3, locked: false });
         rooms.add_edge(lab_1, kitchen, Path { running_cost: 3, locked: false });
@@ -135,7 +135,7 @@ impl World {
         let mut rooms = Graph::new_undirected();
         let lab = rooms.add_node(Room::Lab);
         let charging = rooms.add_node(Room::ChargingStation);
-        let kitchen = rooms.add_node(Room::Kitchen);
+        let kitchen = rooms.add_node(Room::Office);
         rooms.add_edge(lab, charging, Path { running_cost: 2, locked: false });
         rooms.add_edge(charging, kitchen, Path { running_cost: 5, locked: false });
         rooms.add_edge(lab, kitchen, Path { running_cost: 5, locked: false });
@@ -170,7 +170,7 @@ impl World {
             rooms.add_edge(room, other_node, Path { running_cost: 2, locked: false });
         }
 
-        let kitchen = rooms.add_node(Room::Kitchen);
+        let kitchen = rooms.add_node(Room::Office);
         let other_node = rooms
             .node_indices()
             .choose(&mut rng)
@@ -187,7 +187,7 @@ impl World {
     }
 
     pub fn door_scenario() -> (Self, Box<dyn Task>) {
-        const ROOM_TYPES: [Room; 3] = [Room::Kitchen, Room::ChargingStation, Room::Lab];
+        const ROOM_TYPES: [Room; 3] = [Room::Office, Room::ChargingStation, Room::Lab];
         let mut rng = StdRng::seed_from_u64(rand::thread_rng().gen());
 
         let mut rooms = Graph::new_undirected();
@@ -206,14 +206,14 @@ impl World {
     }
 
     pub fn proc_gen_scenario() -> (Self, Box<dyn Task>, Box<dyn Ai>) {
-        const ROOM_TYPES: [Room; 3] = [Room::Kitchen, Room::ChargingStation, Room::Lab];
+        const ROOM_TYPES: [Room; 3] = [Room::Office, Room::ChargingStation, Room::Lab];
         let mut rng = StdRng::from_entropy();
         let mut rooms = Graph::new_undirected();
 
         let start_room_type = *ROOM_TYPES.choose(&mut rng).expect("choose room type");
         let start = rooms.add_node(start_room_type);
 
-        for _ in 0..10 {
+        for _ in 0..12 {
             let room_type = *ROOM_TYPES.choose(&mut rng).expect("choose room type");
             let other_node = rooms
                 .node_indices()

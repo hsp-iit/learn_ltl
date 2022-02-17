@@ -1,10 +1,11 @@
 use petgraph::prelude::*;
 use petgraph::algo::astar;
 use rand::prelude::*;
+use std::fmt::Debug;
 
 use crate::world::*;
 
-pub trait Ai {
+pub trait Ai: Debug {
     fn decide(&mut self, world: &World) -> Action;
 }
 
@@ -27,7 +28,7 @@ impl Ai for RandomAi {
             world.rooms.node_weight(world.icub_location),
             Some(Room::ChargingStation)
         ) && world.icub_charge < World::MAX_CHARGE
-            && self.rng.gen_bool(0.5)
+            // && self.rng.gen_bool(0.5)
         {
             Action::Recharge
         } else if let Some(destination) = world
@@ -50,6 +51,7 @@ impl Ai for RandomAi {
     }
 }
 
+#[derive(Clone, Debug)]
 pub struct AStarAi {
     goal: NodeIndex,
     rng: StdRng,
@@ -71,7 +73,7 @@ impl Ai for AStarAi {
             world.rooms.node_weight(world.icub_location),
             Some(Room::ChargingStation)
         ) && world.icub_charge < World::MAX_CHARGE
-            && self.rng.gen_bool(0.5)
+            // && self.rng.gen_bool(0.5)
         {
             Action::Recharge
         } else if let Some((_, path)) = astar(&world.rooms, world.icub_location, |goal| goal == self.goal, |e| e.weight().running_cost, |_| 0) {
