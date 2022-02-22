@@ -169,9 +169,13 @@ fn sample<const N: usize>(
         let trace = Vec::from_iter((0..length).map(|_| gen_bools()));
         let satisfaction = formula.eval(&trace);
         if satisfaction && sample.positive_traces() < positives {
-            sample.add_positive_trace(trace).expect("add positive trace");
+            sample
+                .add_positive_trace(trace)
+                .expect("add positive trace");
         } else if !satisfaction && sample.negative_traces() < negatives {
-            sample.add_negative_trace(trace).expect("add negative trace");
+            sample
+                .add_negative_trace(trace)
+                .expect("add negative trace");
         }
     }
     sample

@@ -1,5 +1,5 @@
 use serde::Deserialize;
-use std::{fmt, sync::Arc};
+use std::{collections::BTreeSet, fmt, sync::Arc};
 
 /// The type representing time instants.
 pub type Time = u8;
@@ -30,8 +30,6 @@ impl fmt::Display for UnaryOp {
 /// Binary operators
 #[derive(Debug, Clone, Copy, PartialOrd, Ord, PartialEq, Eq, Deserialize)]
 pub enum BinaryOp {
-    And,
-    Or,
     Implies,
     Until,
 }
@@ -39,13 +37,13 @@ pub enum BinaryOp {
 impl fmt::Display for BinaryOp {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match *self {
-            BinaryOp::And => write!(f, "∧"),
-            BinaryOp::Or => write!(f, "∨"),
             BinaryOp::Implies => write!(f, "→"),
             BinaryOp::Until => write!(f, "U"),
         }
     }
 }
+
+pub type ASSet = BTreeSet<SyntaxTree>;
 
 /// A formula represented via its syntax tree.
 /// This is a recursive data structure, so it requires the use of smart pointers.
@@ -61,6 +59,8 @@ pub enum SyntaxTree {
         op: BinaryOp,
         children: Arc<(SyntaxTree, SyntaxTree)>,
     },
+    And(Arc<Vec<SyntaxTree>>),
+    Or(Arc<Vec<SyntaxTree>>),
 }
 
 impl fmt::Display for SyntaxTree {
@@ -70,6 +70,34 @@ impl fmt::Display for SyntaxTree {
             SyntaxTree::Unary { op, child } => write!(f, "{}({})", op, child),
             SyntaxTree::Binary { op, children } => {
                 write!(f, "({}){}({})", children.0, op, children.1)
+            }
+            SyntaxTree::And(leaves) => {
+                if leaves.is_empty() {
+                    write!(f, "True")
+                } else {
+                    for (i, formula) in leaves.iter().enumerate() {
+                        if i > 0 {
+                            write!(f, "∧({formula})")?;
+                        } else {
+                            write!(f, "({formula})")?;
+                        }
+                    }
+                    Ok(())
+                }
+            }
+            SyntaxTree::Or(leaves) => {
+                if leaves.is_empty() {
+                    write!(f, "True")
+                } else {
+                    for (i, formula) in leaves.iter().enumerate() {
+                        if i > 0 {
+                            write!(f, "∨({formula})")?;
+                        } else {
+                            write!(f, "({formula})")?;
+                        }
+                    }
+                    Ok(())
+                }
             }
         }
     }
@@ -83,6 +111,9 @@ impl SyntaxTree {
             SyntaxTree::Atom(n) => *n + 1,
             SyntaxTree::Unary { child, .. } => child.as_ref().vars(),
             SyntaxTree::Binary { children, .. } => children.0.vars().max(children.1.vars()),
+            SyntaxTree::And(leaves) | SyntaxTree::Or(leaves) => {
+                leaves.iter().map(SyntaxTree::vars).max().unwrap_or(0)
+            }
         }
     }
 
@@ -110,8 +141,6 @@ impl SyntaxTree {
                 UnaryOp::Finally => (0..trace.len()).any(|t| child.eval(&trace[t..])),
             },
             SyntaxTree::Binary { op, children } => match *op {
-                BinaryOp::And => children.0.eval(trace) && children.1.eval(trace),
-                BinaryOp::Or => children.0.eval(trace) || children.1.eval(trace),
                 BinaryOp::Implies => !children.0.eval(trace) || children.1.eval(trace),
                 BinaryOp::Until => {
                     if trace.is_empty() {
@@ -137,6 +166,8 @@ impl SyntaxTree {
                     // false
                 }
             },
+            SyntaxTree::And(leaves) => leaves.iter().all(|formula| formula.eval(trace)),
+            SyntaxTree::Or(leaves) => leaves.iter().any(|formula| formula.eval(trace)),
         }
     }
 }
@@ -202,10 +233,7 @@ mod eval {
 
     #[test]
     fn and() {
-        let formula = SyntaxTree::Binary {
-            op: BinaryOp::And,
-            children: Arc::new((ATOM_0, ATOM_1)),
-        };
+        let formula = SyntaxTree::And(Arc::new(vec![ATOM_0, ATOM_1]));
 
         let trace = [[true, true]];
         assert!(formula.eval(&trace));
@@ -216,10 +244,7 @@ mod eval {
 
     #[test]
     fn or() {
-        let formula = SyntaxTree::Binary {
-            op: BinaryOp::Or,
-            children: Arc::new((ATOM_0, ATOM_1)),
-        };
+        let formula = SyntaxTree::Or(Arc::new(vec![ATOM_0, ATOM_1]));
 
         let trace = [[true, false]];
         assert!(formula.eval(&trace));

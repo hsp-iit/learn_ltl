@@ -96,10 +96,7 @@ mod consistency {
             ],
         };
 
-        let formula = SyntaxTree::Binary {
-            op: BinaryOp::And,
-            children: Arc::new((ATOM_0, ATOM_1)),
-        };
+        let formula = SyntaxTree::And(Arc::new(vec![ATOM_0, ATOM_1]));
 
         assert!(sample.is_consistent(&formula));
     }

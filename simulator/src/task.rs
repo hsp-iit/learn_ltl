@@ -25,7 +25,10 @@ impl ReachRoom {
 
 impl Task for ReachRoom {
     fn success(&mut self, world: &World) -> bool {
-        let room = world.rooms.node_weight(world.icub_location).expect("icub location room");
+        let room = world
+            .rooms
+            .node_weight(world.icub_location)
+            .expect("icub location room");
         if *room == self.room {
             self.reached = true;
         }
