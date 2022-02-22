@@ -504,3 +504,19 @@ fn check_until((left_child, right_child): &(SyntaxTree, SyntaxTree)) -> bool {
 }
 
 // TODO: write tests for checks
+
+#[cfg(test)]
+mod learn {
+    use super::*;
+
+    #[test]
+    fn formulae() {
+        for size in 1..=8 {
+            let formulae = SkeletonTree::gen(size)
+                .into_iter()
+                .flat_map(|skeleton| skeleton.gen_formulae::<5>())
+                .count();
+            println!("formulae found (size {size}, vars 5): {formulae}");
+        }
+    }
+}
