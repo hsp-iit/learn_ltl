@@ -511,7 +511,7 @@ mod learn {
 
     #[test]
     fn formulae() {
-        for size in 1..=8 {
+        for size in 1..=10 {
             let formulae = SkeletonTree::gen(size)
                 .into_iter()
                 .flat_map(|skeleton| skeleton.gen_formulae::<5>())
