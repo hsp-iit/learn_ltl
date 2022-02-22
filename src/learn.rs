@@ -703,10 +703,12 @@ mod learn {
 
     #[test]
     fn formulae() {
-        let formulae = SkeletonTree::gen(8)
-            .into_iter()
-            .flat_map(|skeleton| skeleton.gen_formulae::<5>())
-            .count();
-        println!("formulae found (size 8, vars 5): {formulae}");
+        for size in 1..=9 {
+            let formulae = SkeletonTree::gen(size)
+                .into_iter()
+                .flat_map(|skeleton| skeleton.gen_formulae::<5>())
+                .count();
+            println!("formulae found (size {size}, vars 5): {formulae}");
+        }
     }
 }
