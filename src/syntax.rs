@@ -102,18 +102,18 @@ impl SyntaxTree {
             SyntaxTree::Atom(var) => trace
                 .first()
                 .map(|vals| {
-                    vals.get(*var as usize)
-                        .expect("interpret atomic proposition in trace")
+                    *(vals.get(*var as usize)
+                        .expect("interpret atomic proposition in trace"))
                 })
-                .cloned()
                 .unwrap_or(false),
             SyntaxTree::Not(branch) => !branch.eval(trace),
             SyntaxTree::Next(branch) => {
-                if trace.is_empty() {
-                    false
-                } else {
-                    branch.eval(&trace[1..])
-                }
+                !trace.is_empty() && branch.eval(&trace[1..])
+                // if trace.is_empty() {
+                //     false
+                // } else {
+                //     branch.eval(&trace[1..])
+                // }
             }
             SyntaxTree::Globally(branch) => (0..trace.len()).all(|t| branch.eval(&trace[t..])),
             SyntaxTree::Finally(branch) => (0..trace.len()).any(|t| branch.eval(&trace[t..])),
@@ -131,6 +131,8 @@ impl SyntaxTree {
             }
             SyntaxTree::Until(branches) => {
                 let (left_branch, right_branch) = branches.as_ref();
+                // More compact but not any faster formulation
+                // !trace.is_empty() && (right_branch.eval(trace) || (left_branch.eval(trace) && self.eval(&trace[1..])))
                 if trace.is_empty() {
                     false
                 } else if right_branch.eval(trace) {
