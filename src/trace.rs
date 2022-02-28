@@ -77,32 +77,29 @@ impl<const N: usize> Sample<N> {
     }
 }
 
-// #[cfg(test)]
-// mod consistency {
-//     use std::sync::Arc;
+#[cfg(test)]
+mod consistency {
+    use std::sync::Arc;
 
-//     use super::*;
+    use super::*;
 
-//     const ATOM_0: SyntaxTree = SyntaxTree::Atom(0);
+    const ATOM_0: SyntaxTree = SyntaxTree::Atom(0);
 
-//     const ATOM_1: SyntaxTree = SyntaxTree::Atom(1);
+    const ATOM_1: SyntaxTree = SyntaxTree::Atom(1);
 
-//     #[test]
-//     fn and() {
-//         let sample = Sample {
-//             positive_traces: vec![vec![[true, true]]],
-//             negative_traces: vec![
-//                 vec![[false, true]],
-//                 vec![[true, false]],
-//                 vec![[false, false]],
-//             ],
-//         };
+    #[test]
+    fn and() {
+        let sample = Sample {
+            positive_traces: vec![vec![[true, true]]],
+            negative_traces: vec![
+                vec![[false, true]],
+                vec![[true, false]],
+                vec![[false, false]],
+            ],
+        };
 
-//         let formula = SyntaxTree::Binary {
-//             op: BinaryOp::And,
-//             children: Arc::new((ATOM_0, ATOM_1)),
-//         };
+        let formula = SyntaxTree::And(Arc::new((ATOM_0, ATOM_1)));
 
-//         assert!(sample.is_consistent(&formula));
-//     }
-// }
+        assert!(sample.is_consistent(&formula));
+    }
+}

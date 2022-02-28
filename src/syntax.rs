@@ -157,108 +157,90 @@ impl SyntaxTree {
     }
 }
 
-// #[cfg(test)]
-// mod eval {
-//     use super::*;
+#[cfg(test)]
+mod eval {
+    use super::*;
 
-//     const ATOM_0: SyntaxTree = SyntaxTree::Atom(0);
+    const ATOM_0: SyntaxTree = SyntaxTree::Atom(0);
 
-//     const ATOM_1: SyntaxTree = SyntaxTree::Atom(1);
+    const ATOM_1: SyntaxTree = SyntaxTree::Atom(1);
 
-//     #[test]
-//     fn atomic_prop() {
-//         let trace = [[true]];
-//         assert!(ATOM_0.eval(&trace));
+    #[test]
+    fn atomic_prop() {
+        let trace = [[true]];
+        assert!(ATOM_0.eval(&trace));
 
-//         let trace = [[false]];
-//         assert!(!ATOM_0.eval(&trace));
-//     }
+        let trace = [[false]];
+        assert!(!ATOM_0.eval(&trace));
+    }
 
-//     #[test]
-//     fn not() {
-//         let formula = SyntaxTree::Unary {
-//             op: UnaryOp::Not,
-//             child: Arc::new(ATOM_0),
-//         };
+    #[test]
+    fn not() {
+        let formula = SyntaxTree::Not(Arc::new(ATOM_0));
 
-//         let trace = [[false]];
-//         assert!(formula.eval(&trace));
+        let trace = [[false]];
+        assert!(formula.eval(&trace));
 
-//         let trace = [[true]];
-//         assert!(!formula.eval(&trace));
-//     }
+        let trace = [[true]];
+        assert!(!formula.eval(&trace));
+    }
 
-//     #[test]
-//     fn next() {
-//         let formula = SyntaxTree::Unary {
-//             op: UnaryOp::Next,
-//             child: Arc::new(ATOM_0),
-//         };
+    #[test]
+    fn next() {
+        let formula = SyntaxTree::Next(Arc::new(ATOM_0));
 
-//         let trace = [[false], [true]];
-//         assert!(formula.eval(&trace));
+        let trace = [[false], [true]];
+        assert!(formula.eval(&trace));
 
-//         let trace = [[true], [false]];
-//         assert!(!formula.eval(&trace));
-//     }
+        let trace = [[true], [false]];
+        assert!(!formula.eval(&trace));
+    }
 
-//     #[test]
-//     fn globally() {
-//         let formula = SyntaxTree::Unary {
-//             op: UnaryOp::Globally,
-//             child: Arc::new(ATOM_0),
-//         };
+    #[test]
+    fn globally() {
+        let formula = SyntaxTree::Globally(Arc::new(ATOM_0));
 
-//         let trace = [[true], [true], [true]];
-//         assert!(formula.eval(&trace));
+        let trace = [[true], [true], [true]];
+        assert!(formula.eval(&trace));
 
-//         let trace = [[true], [false], [true]];
-//         assert!(!formula.eval(&trace));
-//     }
+        let trace = [[true], [false], [true]];
+        assert!(!formula.eval(&trace));
+    }
 
-//     #[test]
-//     fn and() {
-//         let formula = SyntaxTree::Binary {
-//             op: BinaryOp::And,
-//             children: Arc::new((ATOM_0, ATOM_1)),
-//         };
+    #[test]
+    fn and() {
+        let formula = SyntaxTree::And(Arc::new((ATOM_0, ATOM_1)));
 
-//         let trace = [[true, true]];
-//         assert!(formula.eval(&trace));
+        let trace = [[true, true]];
+        assert!(formula.eval(&trace));
 
-//         let trace = [[true, false]];
-//         assert!(!formula.eval(&trace));
-//     }
+        let trace = [[true, false]];
+        assert!(!formula.eval(&trace));
+    }
 
-//     #[test]
-//     fn or() {
-//         let formula = SyntaxTree::Binary {
-//             op: BinaryOp::Or,
-//             children: Arc::new((ATOM_0, ATOM_1)),
-//         };
+    #[test]
+    fn or() {
+        let formula = SyntaxTree::Or(Arc::new((ATOM_0, ATOM_1)));
 
-//         let trace = [[true, false]];
-//         assert!(formula.eval(&trace));
+        let trace = [[true, false]];
+        assert!(formula.eval(&trace));
 
-//         let trace = [[false, false]];
-//         assert!(!formula.eval(&trace));
-//     }
+        let trace = [[false, false]];
+        assert!(!formula.eval(&trace));
+    }
 
-//     #[test]
-//     fn until() {
-//         let formula = SyntaxTree::Binary {
-//             op: BinaryOp::Until,
-//             children: Arc::new((ATOM_0, ATOM_1)),
-//         };
+    #[test]
+    fn until() {
+        let formula = SyntaxTree::Until(Arc::new((ATOM_0, ATOM_1)));
 
-//         let trace = [[true, false], [false, true], [false, false]];
-//         assert!(formula.eval(&trace));
+        let trace = [[true, false], [false, true], [false, false]];
+        assert!(formula.eval(&trace));
 
-//         let trace = [[true, false], [true, false], [false, false]];
-//         assert!(!formula.eval(&trace));
+        let trace = [[true, false], [true, false], [false, false]];
+        assert!(!formula.eval(&trace));
 
-//         // Until is not satisfied if its right-hand-side argument never becomes true.
-//         let trace = [[true, false], [true, false], [true, false]];
-//         assert!(!formula.eval(&trace));
-//     }
-// }
+        // Until is not satisfied if its right-hand-side argument never becomes true.
+        let trace = [[true, false], [true, false], [true, false]];
+        assert!(!formula.eval(&trace));
+    }
+}
