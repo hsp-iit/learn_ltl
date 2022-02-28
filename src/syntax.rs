@@ -117,8 +117,14 @@ impl SyntaxTree {
             }
             SyntaxTree::Globally(branch) => (0..trace.len()).all(|t| branch.eval(&trace[t..])),
             SyntaxTree::Finally(branch) => (0..trace.len()).any(|t| branch.eval(&trace[t..])),
-            SyntaxTree::And(branches) => branches.0.eval(trace) && branches.1.eval(trace),
-            SyntaxTree::Or(branches) => branches.0.eval(trace) || branches.1.eval(trace),
+            SyntaxTree::And(branches) => {
+                let (left_branch, right_branch) = branches.as_ref();
+                left_branch.eval(trace) && right_branch.eval(trace)
+            }
+            SyntaxTree::Or(branches) => {
+                let (left_branch, right_branch) = branches.as_ref();
+                left_branch.eval(trace) || right_branch.eval(trace)
+            }
             SyntaxTree::Implies(branches) => {
                 let (left_branch, right_branch) = branches.as_ref();
                 !left_branch.eval(trace) || right_branch.eval(trace)
