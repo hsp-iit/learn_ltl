@@ -31,8 +31,8 @@ impl fmt::Display for UnaryOp {
 
 #[derive(Debug, Clone, Copy, PartialOrd, Ord, PartialEq, Eq, Deserialize)]
 pub enum BinaryOp {
-    And,
-    XOr,
+    // And,
+    // XOr,
     // Or,
     // Implies,
     Until,
@@ -45,9 +45,9 @@ pub enum BinaryOp {
 impl fmt::Display for BinaryOp {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match *self {
-            BinaryOp::And => write!(f, "∧"),
+            // BinaryOp::And => write!(f, "∧"),
             // BinaryOp::Or => write!(f, "v"),
-            BinaryOp::XOr => write!(f, "+"),
+            // BinaryOp::XOr => write!(f, "+"),
             // BinaryOp::Implies => write!(f, "→"),
             BinaryOp::Until => write!(f, "U"),
             // BinaryOp::Release => write!(f, "R"),
@@ -70,6 +70,8 @@ pub enum SyntaxTree {
         op: BinaryOp,
         children: Arc<(SyntaxTree, SyntaxTree)>,
     },
+    And(Arc<Vec<SyntaxTree>>),
+    XOr(Arc<Vec<SyntaxTree>>),
 }
 
 impl fmt::Display for SyntaxTree {
@@ -82,6 +84,24 @@ impl fmt::Display for SyntaxTree {
             SyntaxTree::Binary { op, children } => {
                 write!(f, "({}){}({})", children.0, op, children.1)
             }
+            SyntaxTree::And(branches) => {
+                if let Some(branch) = branches.first() {
+                    write!(f, "({branch})")?;
+                    for branch in branches[1..].iter() {
+                        write!(f, "*({branch})")?;
+                    }
+                }
+                Ok(())
+            }
+            SyntaxTree::XOr(branches) => {
+                if let Some(branch) = branches.first() {
+                    write!(f, "({branch})")?;
+                    for branch in branches[1..].iter() {
+                        write!(f, "+({branch})")?;
+                    }
+                }
+                Ok(())
+            }
         }
     }
 }
@@ -93,6 +113,7 @@ impl SyntaxTree {
             SyntaxTree::Zeroary(_) => 0,
             SyntaxTree::Unary { child, .. } => child.as_ref().vars(),
             SyntaxTree::Binary { children, .. } => children.0.vars().max(children.1.vars()),
+            SyntaxTree::And(branches) | SyntaxTree::XOr(branches) => branches.iter().map(SyntaxTree::vars).max().unwrap_or(0),
         }
     }
 
@@ -129,9 +150,9 @@ impl SyntaxTree {
                 // }
             },
             SyntaxTree::Binary { op, children } => match *op {
-                BinaryOp::And => children.0.eval(trace) && children.1.eval(trace),
+                // BinaryOp::And => children.0.eval(trace) && children.1.eval(trace),
                 // BinaryOp::Or => children.0.eval(trace) || children.1.eval(trace),
-                BinaryOp::XOr => children.0.eval(trace) != children.1.eval(trace) ,
+                // BinaryOp::XOr => children.0.eval(trace) != children.1.eval(trace) ,
                 // BinaryOp::Implies => !children.0.eval(trace) || children.1.eval(trace),
                 BinaryOp::Until => {
                     for t in 0..trace.len() {
@@ -170,6 +191,8 @@ impl SyntaxTree {
                   //     (0..until).all(|t| children.0.eval(&trace[t.min(trace.len())..]))
                   // }
             },
+            SyntaxTree::And(branches) => branches.iter().all(|branch| branch.eval(trace)),
+            SyntaxTree::XOr(branches) => branches.iter().filter(|branch| branch.eval(trace)).count() == 1,
         }
     }
 }
@@ -275,19 +298,19 @@ mod eval {
     //     assert!(!formula.eval(&trace));
     // }
 
-    #[test]
-    fn and() {
-        let formula = SyntaxTree::Binary {
-            op: BinaryOp::And,
-            children: Arc::new((ATOM_0, ATOM_1)),
-        };
+    // #[test]
+    // fn and() {
+    //     let formula = SyntaxTree::Binary {
+    //         op: BinaryOp::And,
+    //         children: Arc::new((ATOM_0, ATOM_1)),
+    //     };
 
-        let trace = [[true, true]];
-        assert!(formula.eval(&trace));
+    //     let trace = [[true, true]];
+    //     assert!(formula.eval(&trace));
 
-        let trace = [[true, false]];
-        assert!(!formula.eval(&trace));
-    }
+    //     let trace = [[true, false]];
+    //     assert!(!formula.eval(&trace));
+    // }
 
     // #[test]
     // fn or() {
