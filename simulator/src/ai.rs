@@ -1,5 +1,5 @@
-use petgraph::prelude::*;
 use petgraph::algo::astar;
+use petgraph::prelude::*;
 use rand::prelude::*;
 use std::fmt::Debug;
 
@@ -28,7 +28,7 @@ impl Ai for RandomAi {
             world.rooms.node_weight(world.icub_location),
             Some(Room::ChargingStation)
         ) && world.icub_charge < World::MAX_CHARGE
-            // && self.rng.gen_bool(0.5)
+        // && self.rng.gen_bool(0.5)
         {
             Action::Recharge
         } else if let Some(destination) = world
@@ -58,7 +58,6 @@ pub struct AStarAi {
 }
 
 impl AStarAi {
-
     pub fn new(goal: NodeIndex) -> AStarAi {
         AStarAi {
             goal,
@@ -73,10 +72,16 @@ impl Ai for AStarAi {
             world.rooms.node_weight(world.icub_location),
             Some(Room::ChargingStation)
         ) && world.icub_charge < World::MAX_CHARGE
-            // && self.rng.gen_bool(0.5)
+        // && self.rng.gen_bool(0.5)
         {
             Action::Recharge
-        } else if let Some((_, path)) = astar(&world.rooms, world.icub_location, |goal| goal == self.goal, |e| e.weight().running_cost, |_| 0) {
+        } else if let Some((_, path)) = astar(
+            &world.rooms,
+            world.icub_location,
+            |goal| goal == self.goal,
+            |e| e.weight().running_cost,
+            |_| 0,
+        ) {
             if let Some(node) = path.get(1) {
                 let edge = world
                     .rooms

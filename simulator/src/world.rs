@@ -119,9 +119,30 @@ impl World {
         let lab_1 = rooms.add_node(Room::Lab);
         let lab_2 = rooms.add_node(Room::Lab);
         let kitchen = rooms.add_node(Room::Office);
-        rooms.add_edge(lab_1, lab_2, Path { running_cost: 3, locked: false });
-        rooms.add_edge(lab_2, kitchen, Path { running_cost: 3, locked: false });
-        rooms.add_edge(lab_1, kitchen, Path { running_cost: 3, locked: false });
+        rooms.add_edge(
+            lab_1,
+            lab_2,
+            Path {
+                running_cost: 3,
+                locked: false,
+            },
+        );
+        rooms.add_edge(
+            lab_2,
+            kitchen,
+            Path {
+                running_cost: 3,
+                locked: false,
+            },
+        );
+        rooms.add_edge(
+            lab_1,
+            kitchen,
+            Path {
+                running_cost: 3,
+                locked: false,
+            },
+        );
         World {
             rooms,
             time: 0,
@@ -136,9 +157,30 @@ impl World {
         let lab = rooms.add_node(Room::Lab);
         let charging = rooms.add_node(Room::ChargingStation);
         let kitchen = rooms.add_node(Room::Office);
-        rooms.add_edge(lab, charging, Path { running_cost: 2, locked: false });
-        rooms.add_edge(charging, kitchen, Path { running_cost: 5, locked: false });
-        rooms.add_edge(lab, kitchen, Path { running_cost: 5, locked: false });
+        rooms.add_edge(
+            lab,
+            charging,
+            Path {
+                running_cost: 2,
+                locked: false,
+            },
+        );
+        rooms.add_edge(
+            charging,
+            kitchen,
+            Path {
+                running_cost: 5,
+                locked: false,
+            },
+        );
+        rooms.add_edge(
+            lab,
+            kitchen,
+            Path {
+                running_cost: 5,
+                locked: false,
+            },
+        );
         World {
             rooms,
             time: 0,
@@ -167,7 +209,14 @@ impl World {
                 .node_indices()
                 .choose(&mut rng)
                 .expect("choose a random node");
-            rooms.add_edge(room, other_node, Path { running_cost: 2, locked: false });
+            rooms.add_edge(
+                room,
+                other_node,
+                Path {
+                    running_cost: 2,
+                    locked: false,
+                },
+            );
         }
 
         let kitchen = rooms.add_node(Room::Office);
@@ -175,7 +224,14 @@ impl World {
             .node_indices()
             .choose(&mut rng)
             .expect("choose a random node");
-        rooms.add_edge(kitchen, other_node, Path { running_cost: 3, locked: false });
+        rooms.add_edge(
+            kitchen,
+            other_node,
+            Path {
+                running_cost: 3,
+                locked: false,
+            },
+        );
 
         World {
             rooms,
@@ -193,7 +249,14 @@ impl World {
         let mut rooms = Graph::new_undirected();
         let room_1 = rooms.add_node(*ROOM_TYPES.choose(&mut rng).expect("choose room type"));
         let room_2 = rooms.add_node(*ROOM_TYPES.choose(&mut rng).expect("choose room type"));
-        rooms.add_edge(room_1, room_2, Path { running_cost: 1, locked: rng.gen_bool(0.5) });
+        rooms.add_edge(
+            room_1,
+            room_2,
+            Path {
+                running_cost: 1,
+                locked: rng.gen_bool(0.5),
+            },
+        );
         let world = World {
             rooms,
             time: 0,
@@ -220,7 +283,14 @@ impl World {
                 .choose(&mut rng)
                 .expect("choose a random node");
             let room = rooms.add_node(room_type);
-            rooms.add_edge(room, other_node, Path { running_cost: rng.gen_range(2..=3), locked: rng.gen_bool(0.2) });
+            rooms.add_edge(
+                room,
+                other_node,
+                Path {
+                    running_cost: rng.gen_range(2..=3),
+                    locked: rng.gen_bool(0.2),
+                },
+            );
         }
 
         let goal_room = rooms.node_indices().choose(&mut rng).expect("goal room");
@@ -234,5 +304,4 @@ impl World {
 
         (world, Box::new(task), Box::new(ai))
     }
-
 }

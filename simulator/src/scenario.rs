@@ -1,9 +1,9 @@
+use crate::ai::{AStarAi, Ai};
+use crate::task::{ReachNode, Task};
+use crate::*;
 use learn_pltl_fast::Trace;
 use petgraph::prelude::*;
 use rand::prelude::*;
-use crate::*;
-use crate::ai::{Ai, AStarAi};
-use crate::task::{Task, ReachNode};
 
 #[derive(Debug)]
 pub struct Scenario {
@@ -13,10 +13,7 @@ pub struct Scenario {
 }
 
 impl Scenario {
-    pub fn run<const N: usize>(
-        &mut self,
-        monitors: &[Box<dyn Monitor>; N],
-    ) -> (Trace<N>, bool) {
+    pub fn run<const N: usize>(&mut self, monitors: &[Box<dyn Monitor>; N]) -> (Trace<N>, bool) {
         let mut trace = Vec::new();
         while self.world.running() {
             let mut records = [false; N];
@@ -49,22 +46,24 @@ impl Scenario {
                 .choose(&mut rng)
                 .expect("choose a random node");
             let room = rooms.add_node(room_type);
-            rooms.add_edge(room, other_node, Path { running_cost: rng.gen_range(2..=3), locked: rng.gen_bool(0.2) });
+            rooms.add_edge(
+                room,
+                other_node,
+                Path {
+                    running_cost: rng.gen_range(2..=3),
+                    locked: rng.gen_bool(0.2),
+                },
+            );
         }
 
         let goal_room = rooms.node_indices().choose(&mut rng).expect("goal room");
 
         let world = World::new(rooms, start);
-        
+
         let task = Box::new(ReachNode::new(goal_room));
 
         let ai = Box::new(AStarAi::new(goal_room));
 
-        Scenario {
-            world,
-            ai,
-            task,
-        }
+        Scenario { world, ai, task }
     }
-
 }
