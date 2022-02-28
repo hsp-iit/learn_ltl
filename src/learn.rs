@@ -27,9 +27,9 @@ impl SkeletonTree {
                     .map(|branch| SkeletonTree::UnaryNode(Arc::new(branch)))
                     .collect();
 
-                let nums = SkeletonTree::gen_nums(size - 1, size);
-                for num_tuple in nums {
-                    let skeleton_tuples = num_tuple
+                let size_tuples = SkeletonTree::gen_nums(size - 1, size);
+                for size_tuple in size_tuples {
+                    let skeleton_tuples = size_tuple
                         .into_iter()
                         .map(SkeletonTree::gen)
                         .multi_cartesian_product()
@@ -711,4 +711,20 @@ mod learn {
             println!("formulae found (size {size}, vars 5): {formulae}");
         }
     }
+
+    #[test]
+    fn tuples() {
+        assert_eq!(SkeletonTree::gen_nums(2, 3), vec![
+            vec![1, 1],
+        ]);
+        assert_eq!(SkeletonTree::gen_nums(3, 4), vec![
+            vec![1, 2],
+        ]);
+        assert_eq!(SkeletonTree::gen_nums(4, 5), vec![
+            vec![1, 1, 1],
+            vec![2, 2],
+            vec![1, 3]
+        ]);
+    }
+
 }
