@@ -15,12 +15,13 @@ path = "src/solver/main.rs"
 name = "sampler"
 path = "src/sampler/main.rs"
 
+[[bin]]
+name = "simulator"
+path = "src/simulator/main.rs"
+
 [[bench]]
 name = "sample"
 harness = false
-
-[workspace]
-members = ["./simulator"]
 
 # [profile.release]
 # lto = true
@@ -31,6 +32,7 @@ members = ["./simulator"]
 [dependencies]
 clap = { version = "3.0.0-rc.3", features = ["derive"] }
 itertools = "0.10.*"
+petgraph = "0.6.*"
 rand = "0.8"
 rayon = "1.5.*"
 ron = "0.7.*"

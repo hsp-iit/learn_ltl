@@ -16,7 +16,7 @@ fn main() {
     let sample = collect_sample();
     // let sample = run_scenario(Box::new(Scenario::proc_gen_scenario));
 
-    let name = format!("sample_simulator.ron");
+    let name = "sample_simulator.ron";
     let file = File::create(name).expect("open sample file");
     let buf_writer = BufWriter::new(file);
     ron::ser::to_writer(buf_writer, &sample).expect("serialize sample");

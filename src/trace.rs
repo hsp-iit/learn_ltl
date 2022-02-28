@@ -44,6 +44,7 @@ impl<const N: usize> Sample<N> {
         positive_lenght.max(negative_lenght) as Time
     }
 
+    // https://rust-lang.github.io/rust-clippy/master/index.html#result_unit_err
     pub fn add_positive_trace(&mut self, trace: Trace<N>) -> Result<(), ()> {
         if !self.negative_traces.contains(&trace) {
             if !self.positive_traces.contains(&trace) {
@@ -55,6 +56,7 @@ impl<const N: usize> Sample<N> {
         }
     }
 
+    // https://rust-lang.github.io/rust-clippy/master/index.html#result_unit_err
     pub fn add_negative_trace(&mut self, trace: Trace<N>) -> Result<(), ()> {
         if !self.positive_traces.contains(&trace) {
             if !self.negative_traces.contains(&trace) {
