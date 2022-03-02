@@ -104,10 +104,7 @@ impl SkeletonTree {
                     // }
 
                     if check_next(child.as_ref()) {
-                        trees.push(SyntaxTree::Unary {
-                            op: UnaryOp::Next,
-                            child: child.clone(),
-                        });
+                        trees.push(SyntaxTree::Next(child));
                     }
 
                     // if check_globally(child.as_ref()) {

@@ -4,68 +4,11 @@ use std::{fmt, sync::Arc};
 pub type Time = u8;
 pub type Idx = u8;
 
-#[derive(Debug, Clone, Copy, PartialOrd, Ord, PartialEq, Eq, Deserialize)]
-pub enum UnaryOp {
-    // Not,
-    Next,
-    // Globally,
-    // Finally,
-    // GloballyLeq(Time),
-    // GloballyGneq(Time),
-    // FinallyLeq(Time),
-}
-
-impl fmt::Display for UnaryOp {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match *self {
-            // UnaryOp::FinallyLeq(n) => write!(f, "F≤{}", n),
-            // UnaryOp::Globally => write!(f, "G"),
-            // UnaryOp::Finally => write!(f, "F"),
-            // UnaryOp::GloballyGneq(n) => write!(f, "G>{}", n),
-            // UnaryOp::GloballyLeq(n) => write!(f, "G≤{}", n),
-            UnaryOp::Next => write!(f, "X"),
-            // UnaryOp::Not => write!(f, "¬"),
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialOrd, Ord, PartialEq, Eq, Deserialize)]
-pub enum BinaryOp {
-    // And,
-    // XOr,
-    // Or,
-    // Implies,
-    Until,
-    // Release,
-    // ReleaseLeq(Time),
-    // ReleaseGneq(Time),
-    // UntillLeq(Time),
-}
-
-impl fmt::Display for BinaryOp {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match *self {
-            // BinaryOp::And => write!(f, "∧"),
-            // BinaryOp::Or => write!(f, "v"),
-            // BinaryOp::XOr => write!(f, "+"),
-            // BinaryOp::Implies => write!(f, "→"),
-            BinaryOp::Until => write!(f, "U"),
-            // BinaryOp::Release => write!(f, "R"),
-            // BinaryOp::ReleaseGneq(t) => write!(f, "R>{}", t),
-            // BinaryOp::ReleaseLeq(t) => write!(f, "R≤{}", t),
-            // BinaryOp::UntillLeq(t) => write!(f, "U≤{}", t),
-        }
-    }
-}
-
 #[derive(Debug, Clone, PartialOrd, Ord, PartialEq, Eq, Deserialize)]
 pub enum SyntaxTree {
     Atom(Idx),
     Zeroary(bool),
-    Unary {
-        op: UnaryOp,
-        child: Arc<SyntaxTree>,
-    },
+    Next(Arc<SyntaxTree>),
     Until(Arc<(SyntaxTree, SyntaxTree)>),
     And(Arc<Vec<SyntaxTree>>),
     XOr(Arc<Vec<SyntaxTree>>),
@@ -77,7 +20,7 @@ impl fmt::Display for SyntaxTree {
             SyntaxTree::Atom(var) => write!(f, "x{}", var),
             SyntaxTree::Zeroary(true) => write!(f, "T"),
             SyntaxTree::Zeroary(false) => write!(f, "F"),
-            SyntaxTree::Unary { op, child } => write!(f, "{}({})", op, child),
+            SyntaxTree::Next(branch) => write!(f, "X({branch})"),
             SyntaxTree::Until(children) => {
                 write!(f, "({})U({})", children.0, children.1)
             }
@@ -108,7 +51,7 @@ impl SyntaxTree {
         match self {
             SyntaxTree::Atom(n) => *n + 1,
             SyntaxTree::Zeroary(_) => 0,
-            SyntaxTree::Unary { child, .. } => child.as_ref().vars(),
+            SyntaxTree::Next(child) => child.as_ref().vars(),
             SyntaxTree::Until(children) => children.0.vars().max(children.1.vars()),
             SyntaxTree::And(branches) | SyntaxTree::XOr(branches) => branches.iter().map(SyntaxTree::vars).max().unwrap_or(0),
         }
@@ -125,15 +68,9 @@ impl SyntaxTree {
                 .cloned()
                 .unwrap_or(false),
             SyntaxTree::Zeroary(boolean) => *boolean,
-            SyntaxTree::Unary { op, child } => match *op {
-                // UnaryOp::Not => !child.eval(trace),
-                UnaryOp::Next => {
-                    if trace.is_empty() {
-                        false
-                    } else {
-                        child.eval(&trace[1..])
-                    }
-                }
+            SyntaxTree::Next(child) => {
+                !trace.is_empty() && child.eval(&trace[1..])
+            }
                 // UnaryOp::Globally => (0..trace.len()).all(|t| child.eval(&trace[t..])),
                 // UnaryOp::Finally => (0..trace.len()).any(|t| child.eval(&trace[t..])),
                 // UnaryOp::GloballyLeq(time) => {
@@ -145,7 +82,6 @@ impl SyntaxTree {
                 // UnaryOp::FinallyLeq(time) => {
                 //     (0..(time as usize + 1).min(trace.len())).any(|t| child.eval(&trace[t..]))
                 // }
-            },
             SyntaxTree::Until(children) => {
                 for t in 0..trace.len() {
                     let t_trace = &trace[t..];
@@ -222,10 +158,7 @@ mod eval {
 
     #[test]
     fn next() {
-        let formula = SyntaxTree::Unary {
-            op: UnaryOp::Next,
-            child: Arc::new(ATOM_0),
-        };
+        let formula = SyntaxTree::Next(Arc::new(ATOM_0));
 
         let trace = [[false], [true]];
         assert!(formula.eval(&trace));
