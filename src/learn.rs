@@ -77,15 +77,18 @@ impl SkeletonTree {
     /// and discarded if found to be equivalent to other formulae that have been or will included anyway.
     /// The const generic N represents the set of propositional variables which might appear in the generated formulae.
     fn gen_formulae<const N: usize>(&self) -> Vec<SyntaxTree> {
-        self.gen_formulae_xxx::<N>(true, true)
+        self.gen_formulae_partial::<N>(true, true, true)
     }
 
-    fn gen_formulae_xxx<const N: usize>(&self, and: bool, or: bool) -> Vec<SyntaxTree> {
+    fn gen_formulae_partial<const N: usize>(&self, booleans: bool, and: bool, or: bool) -> Vec<SyntaxTree> {
         match self {
             // Leaves of the `SkeletonTree` correspond to propositional variables
+            SkeletonTree::Leaf if booleans => [SyntaxTree::False, SyntaxTree::True].into_iter()
+                .chain(
+                    (0..N).map(|n| SyntaxTree::Atom(n as Idx))
+                ).collect::<Vec<SyntaxTree>>(),
             SkeletonTree::Leaf => (0..N)
                 .map(|n| SyntaxTree::Atom(n as Idx))
-                .chain([SyntaxTree::Zeroary(false), SyntaxTree::Zeroary(true)])
                 .collect::<Vec<SyntaxTree>>(),
             // Unary nodes of the `SkeletonTree` correspond to unary operators of LTL
             SkeletonTree::UnaryNode(child) => {
@@ -94,7 +97,7 @@ impl SkeletonTree {
                 let mut trees = Vec::with_capacity(4 * children.len());
 
                 for child in children {
-                    let child = Arc::new(child);
+                    let child = Box::new(child);
 
                     // if check_not(child.as_ref()) {
                     //     trees.push(SyntaxTree::Unary {
@@ -137,7 +140,7 @@ impl SkeletonTree {
                     .cartesian_product(right_children.into_iter());
 
                 for (left_child, right_child) in children {
-                    let children = Arc::new((left_child, right_child));
+                    let children = Box::new((left_child, right_child));
 
                     // if check_implies(children.as_ref()) {
                     //     trees.push(SyntaxTree::Binary {
@@ -167,18 +170,18 @@ impl SkeletonTree {
                             .dedup_with_count()
                             .map(|(multiplicity, skeleton)| {
                                 skeleton
-                                    .gen_formulae_xxx::<N>(false, false)
+                                    .gen_formulae_partial::<N>(false, false, false)
                                     .into_iter()
                                     .combinations(multiplicity)
                             })
                             .multi_cartesian_product()
                             .filter_map(|tuples_of_subformulae| {
                                 let subformulae = tuples_of_subformulae.concat();
-                                if check_and(&subformulae) {
-                                    Some(SyntaxTree::And(Arc::new(subformulae)))
-                                } else {
-                                    None
-                                }
+                                // if check_and(&subformulae) {
+                                    Some(SyntaxTree::And(subformulae))
+                                // } else {
+                                //     None
+                                // }
                             }),
                     );
                 }
@@ -190,7 +193,7 @@ impl SkeletonTree {
                             .dedup_with_count()
                             .map(|(multiplicity, skeleton)| {
                                 skeleton
-                                    .gen_formulae_xxx::<N>(true, false)
+                                    .gen_formulae_partial::<N>(true, true, false)
                                     .into_iter()
                                     .combinations(multiplicity)
                             })
@@ -198,7 +201,7 @@ impl SkeletonTree {
                             .filter_map(|tuples_of_subformulae| {
                                 let subformulae = tuples_of_subformulae.concat();
                                 if check_xor(&subformulae) {
-                                    Some(SyntaxTree::XOr(Arc::new(subformulae)))
+                                    Some(SyntaxTree::XOr(subformulae))
                                 } else {
                                     None
                                 }
@@ -271,7 +274,8 @@ fn check_next(child: &SyntaxTree) -> bool {
     !matches!(
         child,
         // X False ≡ False, X True ≡ True
-        SyntaxTree::Zeroary(_)
+        SyntaxTree::True
+        | SyntaxTree::False
         // X (x + y) -> Xx + Xy
         // X (x /\ y) -> Xx /\ Xy
         // X (x U y) -> Xx U Xy
@@ -567,11 +571,11 @@ fn check_until((left_child, right_child): &(SyntaxTree, SyntaxTree)) -> bool {
 }
 
 fn check_xor(branches: &[SyntaxTree]) -> bool {
-    branches.iter().all(|branch| !matches!(branch, SyntaxTree::Zeroary(false)))
+    branches.iter().all(|branch| !matches!(branch, SyntaxTree::False))
 }
 
-fn check_and(branches: &[SyntaxTree]) -> bool {
-    branches.iter().all(|branch| !matches!(branch, SyntaxTree::Zeroary(_)))
-}
+// fn check_and(branches: &[SyntaxTree]) -> bool {
+//     branches.iter().all(|branch| !matches!(branch, SyntaxTree::True | SyntaxTree::False))
+// }
 
 // TODO: write tests for checks
