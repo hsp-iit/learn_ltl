@@ -66,10 +66,7 @@ pub enum SyntaxTree {
         op: UnaryOp,
         child: Arc<SyntaxTree>,
     },
-    Binary {
-        op: BinaryOp,
-        children: Arc<(SyntaxTree, SyntaxTree)>,
-    },
+    Until(Arc<(SyntaxTree, SyntaxTree)>),
     And(Arc<Vec<SyntaxTree>>),
     XOr(Arc<Vec<SyntaxTree>>),
 }
@@ -81,8 +78,8 @@ impl fmt::Display for SyntaxTree {
             SyntaxTree::Zeroary(true) => write!(f, "T"),
             SyntaxTree::Zeroary(false) => write!(f, "F"),
             SyntaxTree::Unary { op, child } => write!(f, "{}({})", op, child),
-            SyntaxTree::Binary { op, children } => {
-                write!(f, "({}){}({})", children.0, op, children.1)
+            SyntaxTree::Until(children) => {
+                write!(f, "({})U({})", children.0, children.1)
             }
             SyntaxTree::And(branches) => {
                 if let Some(branch) = branches.first() {
@@ -112,7 +109,7 @@ impl SyntaxTree {
             SyntaxTree::Atom(n) => *n + 1,
             SyntaxTree::Zeroary(_) => 0,
             SyntaxTree::Unary { child, .. } => child.as_ref().vars(),
-            SyntaxTree::Binary { children, .. } => children.0.vars().max(children.1.vars()),
+            SyntaxTree::Until(children) => children.0.vars().max(children.1.vars()),
             SyntaxTree::And(branches) | SyntaxTree::XOr(branches) => branches.iter().map(SyntaxTree::vars).max().unwrap_or(0),
         }
     }
@@ -149,22 +146,18 @@ impl SyntaxTree {
                 //     (0..(time as usize + 1).min(trace.len())).any(|t| child.eval(&trace[t..]))
                 // }
             },
-            SyntaxTree::Binary { op, children } => match *op {
-                // BinaryOp::And => children.0.eval(trace) && children.1.eval(trace),
-                // BinaryOp::Or => children.0.eval(trace) || children.1.eval(trace),
-                // BinaryOp::XOr => children.0.eval(trace) != children.1.eval(trace) ,
-                // BinaryOp::Implies => !children.0.eval(trace) || children.1.eval(trace),
-                BinaryOp::Until => {
-                    for t in 0..trace.len() {
-                        let t_trace = &trace[t..];
-                        if children.1.eval(t_trace) {
-                            return true;
-                        } else if !children.0.eval(t_trace) {
-                            return false;
-                        }
+            SyntaxTree::Until(children) => {
+                for t in 0..trace.len() {
+                    let t_trace = &trace[t..];
+                    if children.1.eval(t_trace) {
+                        return true;
+                    } else if !children.0.eval(t_trace) {
+                        return false;
                     }
-                    true
-                } // BinaryOp::Release => {
+                }
+                true
+            }
+            // BinaryOp::Release => {
                   //     // TODO: it's probably possible to optimize this
                   //     let release = (0..trace.len())
                   //         .find(|t| children.0.eval(&trace[*t..]))
@@ -190,7 +183,6 @@ impl SyntaxTree {
                   //         .unwrap_or(time as usize + 1);
                   //     (0..until).all(|t| children.0.eval(&trace[t.min(trace.len())..]))
                   // }
-            },
             SyntaxTree::And(branches) => branches.iter().all(|branch| branch.eval(trace)),
             SyntaxTree::XOr(branches) => branches.iter().filter(|branch| branch.eval(trace)).count() == 1,
         }
@@ -328,10 +320,7 @@ mod eval {
 
     #[test]
     fn until() {
-        let formula = SyntaxTree::Binary {
-            op: BinaryOp::Until,
-            children: Arc::new((ATOM_0, ATOM_1)),
-        };
+        let formula = SyntaxTree::Until(Arc::new((ATOM_0, ATOM_1)));
 
         let trace = [[true, false], [false, true], [false, false]];
         assert!(formula.eval(&trace));

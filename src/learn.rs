@@ -150,10 +150,7 @@ impl SkeletonTree {
                     // }
 
                     if check_until(children.as_ref()) {
-                        trees.push(SyntaxTree::Binary {
-                            op: BinaryOp::Until,
-                            children,
-                        });
+                        trees.push(SyntaxTree::Until(children));
                     }
                 }
 
@@ -281,7 +278,7 @@ fn check_next(child: &SyntaxTree) -> bool {
         // X (x + y) -> Xx + Xy
         // X (x /\ y) -> Xx /\ Xy
         // X (x U y) -> Xx U Xy
-        | SyntaxTree::Binary { op: BinaryOp::Until, .. }
+        | SyntaxTree::Until(_)
         | SyntaxTree::And(_)
         | SyntaxTree::XOr(_)
     )
@@ -554,22 +551,19 @@ fn check_until((left_child, right_child): &(SyntaxTree, SyntaxTree)) -> bool {
             //     },
             //     ..
             // )
-            // X (φ U ψ) ≡ (X φ) U (X ψ)
-            (
-                SyntaxTree::Unary {
-                    op: UnaryOp::Next, ..
-                },
-                SyntaxTree::Unary {
-                    op: UnaryOp::Next, ..
-                },
-            ) => false,
+            // // X (φ U ψ) ≡ (X φ) U (X ψ)
+            // (
+            //     SyntaxTree::Unary {
+            //         op: UnaryOp::Next, ..
+            //     },
+            //     SyntaxTree::Unary {
+            //         op: UnaryOp::Next, ..
+            //     },
+            // ) => false,
             // φ U ψ ≡ φ U (φ U ψ)
             (
                 left_child,
-                SyntaxTree::Binary {
-                    op: BinaryOp::Until,
-                    children,
-                },
+                SyntaxTree::Until(children),
             ) if *left_child == children.0 => false,
             _ => true,
         }
