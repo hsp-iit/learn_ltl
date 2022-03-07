@@ -2,15 +2,13 @@ use crate::syntax::*;
 use crate::trace::*;
 use itertools::Itertools;
 
-use std::sync::Arc;
-
 /// A tree structure with unary and binary nodes, but containing no data.
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum SkeletonTree {
     Leaf,
-    UnaryNode(Arc<SkeletonTree>),
-    BinaryNode(Arc<(SkeletonTree, SkeletonTree)>),
-    ASNode(Arc<Vec<SkeletonTree>>),
+    UnaryNode(Box<SkeletonTree>),
+    BinaryNode(Box<(SkeletonTree, SkeletonTree)>),
+    ASNode(Vec<SkeletonTree>),
 }
 
 impl SkeletonTree {
@@ -24,7 +22,7 @@ impl SkeletonTree {
                 let smaller_skeletons = Self::gen(size - 1);
                 let mut skeletons: Vec<SkeletonTree> = smaller_skeletons
                     .into_iter()
-                    .map(|branch| SkeletonTree::UnaryNode(Arc::new(branch)))
+                    .map(|branch| SkeletonTree::UnaryNode(Box::new(branch)))
                     .collect();
 
                 let size_tuples = SkeletonTree::gen_nums(size - 1, size);
@@ -33,7 +31,7 @@ impl SkeletonTree {
                         .into_iter()
                         .map(SkeletonTree::gen)
                         .multi_cartesian_product()
-                        .map(|formulae| SkeletonTree::ASNode(Arc::new(formulae)));
+                        .map(|formulae| SkeletonTree::ASNode(formulae));
                     skeletons.extend(skeleton_tuples);
                 }
 
@@ -45,7 +43,7 @@ impl SkeletonTree {
                         left_smaller_skeletons
                             .into_iter()
                             .cartesian_product(right_smaller_skeletons.into_iter())
-                            .map(|branches| SkeletonTree::BinaryNode(Arc::new(branches))),
+                            .map(|branches| SkeletonTree::BinaryNode(Box::new(branches))),
                     );
                 }
 
@@ -92,71 +90,84 @@ impl SkeletonTree {
                 .collect::<Vec<SyntaxTree>>(),
             // Unary nodes of the `SkeletonTree` correspond to unary operators of LTL
             SkeletonTree::UnaryNode(child) => {
-                let children = child.gen_formulae::<N>();
-                // Use known bounds to allocate just as much memory as needed and avoid reallocations.
-                let mut trees = Vec::with_capacity(4 * children.len());
+                child.gen_formulae::<N>()
+                    .into_iter()
+                    .filter(check_next)
+                    .map(|child| SyntaxTree::Next(Box::new(child)))
+                    .collect()
 
-                for child in children {
-                    let child = Box::new(child);
+                // let children = child.gen_formulae::<N>();
+                // // Use known bounds to allocate just as much memory as needed and avoid reallocations.
+                // let mut trees = Vec::with_capacity(4 * children.len());
 
-                    // if check_not(child.as_ref()) {
-                    //     trees.push(SyntaxTree::Unary {
-                    //         op: UnaryOp::Not,
-                    //         child: child.clone(),
-                    //     });
-                    // }
+                // for child in children {
+                //     let child = Box::new(child);
 
-                    if check_next(child.as_ref()) {
-                        trees.push(SyntaxTree::Next(child));
-                    }
+                //     // if check_not(child.as_ref()) {
+                //     //     trees.push(SyntaxTree::Unary {
+                //     //         op: UnaryOp::Not,
+                //     //         child: child.clone(),
+                //     //     });
+                //     // }
 
-                    // if check_globally(child.as_ref()) {
-                    //     trees.push(SyntaxTree::Unary {
-                    //         op: UnaryOp::Globally,
-                    //         child: child.clone(),
-                    //     });
-                    // }
+                //     if check_next(child.as_ref()) {
+                //         trees.push(SyntaxTree::Next(child));
+                //     }
 
-                    // if check_finally(child.as_ref()) {
-                    //     trees.push(SyntaxTree::Unary {
-                    //         op: UnaryOp::Finally,
-                    //         child,
-                    //     });
-                    // }
-                }
+                //     // if check_globally(child.as_ref()) {
+                //     //     trees.push(SyntaxTree::Unary {
+                //     //         op: UnaryOp::Globally,
+                //     //         child: child.clone(),
+                //     //     });
+                //     // }
 
-                trees.shrink_to_fit();
+                //     // if check_finally(child.as_ref()) {
+                //     //     trees.push(SyntaxTree::Unary {
+                //     //         op: UnaryOp::Finally,
+                //     //         child,
+                //     //     });
+                //     // }
+                // }
 
-                trees
+                // trees.shrink_to_fit();
+
+                // trees
             }
             // Binary nodes of the `SkeletonTree` correspond to binary operators of LTL
             SkeletonTree::BinaryNode(child) => {
-                let left_children = child.0.gen_formulae::<N>();
-                let right_children = child.1.gen_formulae::<N>();
-                // Use known bounds to allocate just as much memory as needed and avoid reallocations.
-                let mut trees = Vec::with_capacity(2 * left_children.len() * right_children.len());
-                let children = left_children
+                child.0.gen_formulae::<N>()
                     .into_iter()
-                    .cartesian_product(right_children.into_iter());
+                    .cartesian_product(child.1.gen_formulae::<N>().into_iter())
+                    .filter(check_until)
+                    .map(|children| SyntaxTree::Until(Box::new(children)))
+                    .collect()
 
-                for (left_child, right_child) in children {
-                    let children = Box::new((left_child, right_child));
+                // let left_children = child.0.gen_formulae::<N>();
+                // let right_children = child.1.gen_formulae::<N>();
+                // // Use known bounds to allocate just as much memory as needed and avoid reallocations.
+                // let mut trees = Vec::with_capacity(2 * left_children.len() * right_children.len());
+                // let children = left_children
+                //     .into_iter()
+                //     .cartesian_product(right_children.into_iter());
 
-                    // if check_implies(children.as_ref()) {
-                    //     trees.push(SyntaxTree::Binary {
-                    //         op: BinaryOp::Implies,
-                    //         children: children.clone(),
-                    //     });
-                    // }
+                // for (left_child, right_child) in children {
+                //     let children = Box::new((left_child, right_child));
 
-                    if check_until(children.as_ref()) {
-                        trees.push(SyntaxTree::Until(children));
-                    }
-                }
+                //     // if check_implies(children.as_ref()) {
+                //     //     trees.push(SyntaxTree::Binary {
+                //     //         op: BinaryOp::Implies,
+                //     //         children: children.clone(),
+                //     //     });
+                //     // }
 
-                trees.shrink_to_fit();
+                //     if check_until(children.as_ref()) {
+                //         trees.push(SyntaxTree::Until(children));
+                //     }
+                // }
 
-                trees
+                // trees.shrink_to_fit();
+
+                // trees
             }
             SkeletonTree::ASNode(leaves) => {
                 use itertools::*;
@@ -579,3 +590,48 @@ fn check_xor(branches: &[SyntaxTree]) -> bool {
 // }
 
 // TODO: write tests for checks
+#[cfg(test)]
+mod learn {
+    use std::mem::size_of;
+
+    use super::*;
+
+    #[test]
+    fn gen_skeletons() {
+        for sk in SkeletonTree::gen(5) {
+            println!("{sk:?}");
+        }
+    }
+
+    #[test]
+    fn gen_formulae() {
+        let sk = SkeletonTree::ASNode(vec![
+            SkeletonTree::BinaryNode(Box::new((
+                SkeletonTree::Leaf,
+                SkeletonTree::Leaf,
+            ))),
+            SkeletonTree::UnaryNode(
+                Box::new(SkeletonTree::Leaf)
+            )
+        ]);
+        
+        for formula in sk.gen_formulae::<2>() {
+            println!("{formula}");
+        }
+    }
+
+    #[test]
+    pub fn num_gen_formulae() {
+        const VARS: usize = 5;
+
+        println!("size of formulae: {}B", size_of::<SyntaxTree>());
+
+        for size in 1..12 {
+            let formulae = SkeletonTree::gen(size)
+                .into_iter()
+                .flat_map(|skeleton| skeleton.gen_formulae::<VARS>())
+                .count();
+            println!("Formulae of size {size}: {formulae} ({VARS} vars)");
+        }
+    }
+}
