@@ -83,15 +83,17 @@ impl SyntaxTree {
                 //     (0..(time as usize + 1).min(trace.len())).any(|t| child.eval(&trace[t..]))
                 // }
             SyntaxTree::Until(children) => {
-                for t in 0..trace.len() {
-                    let t_trace = &trace[t..];
-                    if children.1.eval(t_trace) {
-                        return true;
-                    } else if !children.0.eval(t_trace) {
-                        return false;
-                    }
-                }
-                true
+                !trace.is_empty() && ( children.1.eval(trace) || ( children.0.eval(trace) && self.eval(&trace[1..]) ) )
+
+                // for t in 0..trace.len() {
+                //     let t_trace = &trace[t..];
+                //     if children.1.eval(t_trace) {
+                //         return true;
+                //     } else if !children.0.eval(t_trace) {
+                //         return false;
+                //     }
+                // }
+                // false
             }
             // BinaryOp::Release => {
                   //     // TODO: it's probably possible to optimize this
@@ -259,6 +261,9 @@ mod eval {
         assert!(formula.eval(&trace));
 
         let trace = [[true, false], [true, false], [false, false]];
+        assert!(!formula.eval(&trace));
+
+        let trace = [[true, false], [true, false], [true, false]];
         assert!(!formula.eval(&trace));
     }
 
