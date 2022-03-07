@@ -41,11 +41,13 @@ impl SkeletonTree {
     fn gen_formulae<const N: usize>(&self) -> Vec<SyntaxTree> {
         match self {
             SkeletonTree::Leaf => {
-                let mut leaves = (0..N)
-                .map(|n| SyntaxTree::Atom(n as Idx))
-                .collect::<Vec<SyntaxTree>>();
-                leaves.push(SyntaxTree::Zeroary(false));
-                leaves.push(SyntaxTree::Zeroary(true));
+                let mut leaves = vec![SyntaxTree::True, SyntaxTree::False];
+                leaves.extend(
+                    (0..N)
+                    .map(|n| SyntaxTree::Atom(n as Idx))
+                );
+                // leaves.push(SyntaxTree::Zeroary(false));
+                // leaves.push(SyntaxTree::Zeroary(true));
                 leaves
             }
             SkeletonTree::UnaryNode(child) => {
@@ -202,7 +204,8 @@ fn check_next(child: &SyntaxTree) -> bool {
     !matches!(
         child,
         // X False ≡ False, X True ≡ True
-        SyntaxTree::Zeroary(_)
+        SyntaxTree::True
+        | &SyntaxTree::False
         // X (x + y) -> Xx + Xy
         // X (x /\ y) -> Xx /\ Xy
         // X (x U y) -> Xx U Xy
@@ -239,9 +242,9 @@ fn check_and((left_child, right_child): &(SyntaxTree, SyntaxTree)) -> bool {
     left_child < right_child
         && match (left_child, right_child) {
         // 0 /\ x -> 0, 1 /\ x -> x
-        (SyntaxTree::Zeroary(_), _)
+        (SyntaxTree::True | SyntaxTree::False, _)
         // x /\ 0 -> 0, x /\ 1 -> x
-        | (_, SyntaxTree::Zeroary(_))
+        | (_, SyntaxTree::True | SyntaxTree::False)
         // //  Excluded middle
         // (child, SyntaxTree::Unary { op: UnaryOp::Not, child: neg_child })
         // |(SyntaxTree::Unary { op: UnaryOp::Not, child: neg_child }, child) if child == neg_child.as_ref() => false,
@@ -502,9 +505,9 @@ fn check_xor((left_child, right_child): &(SyntaxTree, SyntaxTree)) -> bool {
     left_child < right_child
         && match (left_child, right_child) {
         // 0 + x -> x
-        (SyntaxTree::Zeroary(false), _)
+        (SyntaxTree::False, _)
         // x + 0 -> x
-        | (_, SyntaxTree::Zeroary(false))
+        | (_, SyntaxTree::False)
         // Associative laws
         | (SyntaxTree::Binary { op: BinaryOp::XOr, .. }, ..) => false,
         _ => {

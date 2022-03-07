@@ -61,7 +61,8 @@ impl fmt::Display for BinaryOp {
 #[derive(Debug, Clone, PartialOrd, Ord, PartialEq, Eq, Deserialize)]
 pub enum SyntaxTree {
     Atom(Idx),
-    Zeroary(bool),
+    True,
+    False,
     Unary {
         op: UnaryOp,
         child: Arc<SyntaxTree>,
@@ -76,8 +77,8 @@ impl fmt::Display for SyntaxTree {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             SyntaxTree::Atom(var) => write!(f, "x{}", var),
-            SyntaxTree::Zeroary(true) => write!(f, "T"),
-            SyntaxTree::Zeroary(false) => write!(f, "F"),
+            SyntaxTree::True => write!(f, "T"),
+            SyntaxTree::False => write!(f, "F"),
             SyntaxTree::Unary { op, child } => write!(f, "{}({})", op, child),
             SyntaxTree::Binary { op, children } => {
                 write!(f, "({}){}({})", children.0, op, children.1)
@@ -90,7 +91,7 @@ impl SyntaxTree {
     pub fn vars(&self) -> Idx {
         match self {
             SyntaxTree::Atom(n) => *n + 1,
-            SyntaxTree::Zeroary(_) => 0,
+            SyntaxTree::True| &SyntaxTree::False => 0,
             SyntaxTree::Unary { child, .. } => child.as_ref().vars(),
             SyntaxTree::Binary { children, .. } => children.0.vars().max(children.1.vars()),
         }
@@ -106,8 +107,9 @@ impl SyntaxTree {
                 })
                 .cloned()
                 .unwrap_or(false),
-            SyntaxTree::Zeroary(boolean) => *boolean,
-            SyntaxTree::Unary { op, child } => match *op {
+                SyntaxTree::True => true,
+                SyntaxTree::False => false,
+                SyntaxTree::Unary { op, child } => match *op {
                 // UnaryOp::Not => !child.eval(trace),
                 UnaryOp::Next => {
                     if trace.is_empty() {
@@ -134,15 +136,17 @@ impl SyntaxTree {
                 BinaryOp::XOr => children.0.eval(trace) != children.1.eval(trace) ,
                 // BinaryOp::Implies => !children.0.eval(trace) || children.1.eval(trace),
                 BinaryOp::Until => {
-                    for t in 0..trace.len() {
-                        let t_trace = &trace[t..];
-                        if children.1.eval(t_trace) {
-                            return true;
-                        } else if !children.0.eval(t_trace) {
-                            return false;
-                        }
-                    }
-                    true
+                    !trace.is_empty() && ( children.1.eval(trace) || ( children.0.eval(trace) && self.eval(&trace[1..]) ) )
+
+                    // for t in 0..trace.len() {
+                    //     let t_trace = &trace[t..];
+                    //     if children.1.eval(t_trace) {
+                    //         return true;
+                    //     } else if !children.0.eval(t_trace) {
+                    //         return false;
+                    //     }
+                    // }
+                    // false
                 } // BinaryOp::Release => {
                   //     // TODO: it's probably possible to optimize this
                   //     let release = (0..trace.len())
