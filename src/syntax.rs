@@ -67,10 +67,10 @@ impl fmt::Display for SyntaxTree {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             SyntaxTree::Atom(var) => write!(f, "x{}", var),
-            SyntaxTree::Not(branch) => write!(f, "¬({branch})"),
-            SyntaxTree::Next(branch) => write!(f, "X({branch})"),
-            SyntaxTree::Globally(branch) => write!(f, "G({branch})"),
-            SyntaxTree::Finally(branch) => write!(f, "F({branch})"),
+            SyntaxTree::Not(branch) => write!(f, "¬({})", branch),
+            SyntaxTree::Next(branch) => write!(f, "X({})", branch),
+            SyntaxTree::Globally(branch) => write!(f, "G({})", branch),
+            SyntaxTree::Finally(branch) => write!(f, "F({})", branch),
             SyntaxTree::And(branches) => write!(f, "({})∧({})", branches.0, branches.1),
             SyntaxTree::Or(branches) => write!(f, "({})∨({})", branches.0, branches.1),
             SyntaxTree::Implies(branches) => write!(f, "({})→({})", branches.0, branches.1),
