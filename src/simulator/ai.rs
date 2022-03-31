@@ -64,6 +64,29 @@ impl AStarAi {
             rng: StdRng::from_entropy(),
         }
     }
+
+    fn pathing(&mut self, world: &World, to: NodeIndex) -> Option<(NodeIndex, EdgeIndex)> {
+        if let Some((_, path)) = astar(
+            &world.rooms,
+            world.icub_location,
+            |goal| goal == to,
+            |e| e.weight().running_cost,
+            |_| 0,
+        ) {
+            if let Some(node) = path.get(1) {
+                world
+                    .rooms
+                    .edges_connecting(world.icub_location, *node)
+                    .choose(&mut self.rng)
+                    // .expect("edge connecting icub_location and first node of astar path")
+                    .map(|edge| (*node, edge.id()))
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    }
 }
 
 impl Ai for AStarAi {
@@ -72,26 +95,22 @@ impl Ai for AStarAi {
             world.rooms.node_weight(world.icub_location),
             Some(Room::ChargingStation)
         ) && world.icub_charge < World::MAX_CHARGE
-        // && self.rng.gen_bool(0.5)
         {
             Action::Recharge
-        } else if let Some((_, path)) = astar(
-            &world.rooms,
-            world.icub_location,
-            |goal| goal == self.goal,
-            |e| e.weight().running_cost,
-            |_| 0,
-        ) {
-            if let Some(node) = path.get(1) {
-                let edge = world
-                    .rooms
-                    .edges_connecting(world.icub_location, *node)
-                    .choose(&mut self.rng)
-                    .expect("edge connecting icub_location and first node of astar path");
-                Action::Move(*node, edge.id())
+        } else if world.icub_charge * 10 < World::MAX_CHARGE * 7 {
+            if let Some(charging_station) = world.rooms.node_indices().find(|idx| world.rooms[*idx] == Room::ChargingStation) {
+                if let Some((node, edge)) = self.pathing(world, charging_station) {
+                    Action::Move(node, edge)
+                } else {
+                    Action::Wait
+                }
+            } else  if let Some((node, edge)) = self.pathing(world, self.goal) {
+                Action::Move(node, edge)
             } else {
                 Action::Wait
             }
+        } else if let Some((node, edge)) = self.pathing(world, self.goal) {
+            Action::Move(node, edge)
         } else {
             Action::Wait
         }

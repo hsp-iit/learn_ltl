@@ -304,4 +304,74 @@ impl World {
 
         (world, Box::new(task), Box::new(ai))
     }
+
+    pub fn proc_gen_one_scenario() -> (Self, Box<dyn Task>, Box<dyn Ai>) {
+        const ROOM_TYPES: [Room; 2] = [Room::Office, Room::Lab];
+        let mut rng = StdRng::from_entropy();
+        let mut rooms = Graph::new_undirected();
+
+        let start_room_type = *ROOM_TYPES.choose(&mut rng).expect("choose room type");
+        let start = rooms.add_node(start_room_type);
+
+        for _ in 0..12 {
+            let room_type = *ROOM_TYPES.choose(&mut rng).expect("choose room type");
+            let other_node = rooms
+                .node_indices()
+                .choose(&mut rng)
+                .expect("choose a random node");
+            let room = rooms.add_node(room_type);
+            rooms.add_edge(
+                room,
+                other_node,
+                Path {
+                    running_cost: rng.gen_range(2..=3),
+                    locked: false,
+                },
+            );
+        }
+
+        // Charging station
+        let other_node = rooms
+            .node_indices()
+            .choose(&mut rng)
+            .expect("choose a random node");
+        let room = rooms.add_node(Room::ChargingStation);
+        rooms.add_edge(
+            room,
+            other_node,
+            Path {
+                running_cost: rng.gen_range(2..=3),
+                locked: rng.gen_bool(0.25),
+                // locked: false,
+            },
+        );
+
+        // Goal room
+        let room_type = *ROOM_TYPES.choose(&mut rng).expect("choose room type");
+        let other_node = rooms
+            .node_indices()
+            .choose(&mut rng)
+            .expect("choose a random node");
+        let goal_room = rooms.add_node(room_type);
+        rooms.add_edge(
+            goal_room,
+            other_node,
+            Path {
+                running_cost: rng.gen_range(2..=3),
+                locked: rng.gen_bool(0.25),
+                // locked: false,
+            },
+        );
+
+        let task = ReachNode::new(goal_room);
+
+        let world = World::new(rooms, start);
+
+        // let ai = RandomAi::default();
+        let ai = AStarAi::new(goal_room);
+
+        (world, Box::new(task), Box::new(ai))
+    }
+
+
 }
