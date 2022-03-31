@@ -1,5 +1,5 @@
 use serde::Deserialize;
-use std::fmt;
+use std::{fmt, sync::Arc};
 
 pub type Time = u8;
 pub type Idx = u8;
@@ -9,10 +9,10 @@ pub enum SyntaxTree {
     Atom(Idx),
     True,
     False,
-    Next(Box<SyntaxTree>),
-    Until(Box<(SyntaxTree, SyntaxTree)>),
-    And(Vec<SyntaxTree>),
-    XOr(Vec<SyntaxTree>),
+    Next(Arc<SyntaxTree>),
+    Until(Arc<(SyntaxTree, SyntaxTree)>),
+    And(Vec<Arc<SyntaxTree>>),
+    XOr(Vec<Arc<SyntaxTree>>),
 }
 
 impl fmt::Display for SyntaxTree {
@@ -54,7 +54,7 @@ impl SyntaxTree {
             SyntaxTree::True | SyntaxTree::False => 0,
             SyntaxTree::Next(child) => child.as_ref().vars(),
             SyntaxTree::Until(children) => children.0.vars().max(children.1.vars()),
-            SyntaxTree::And(branches) | SyntaxTree::XOr(branches) => branches.iter().map(SyntaxTree::vars).max().unwrap_or(0),
+            SyntaxTree::And(branches) | SyntaxTree::XOr(branches) => branches.iter().map(|branch| branch.vars()).max().unwrap_or(0),
         }
     }
 
@@ -160,7 +160,7 @@ mod eval {
 
     #[test]
     fn next() {
-        let formula = SyntaxTree::Next(Box::new(ATOM_0));
+        let formula = SyntaxTree::Next(Arc::new(ATOM_0));
 
         let trace = [[false], [true]];
         assert!(formula.eval(&trace));
@@ -255,7 +255,7 @@ mod eval {
 
     #[test]
     fn until() {
-        let formula = SyntaxTree::Until(Box::new((ATOM_0, ATOM_1)));
+        let formula = SyntaxTree::Until(Arc::new((ATOM_0, ATOM_1)));
 
         let trace = [[true, false], [false, true], [false, false]];
         assert!(formula.eval(&trace));

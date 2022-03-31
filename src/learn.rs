@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use crate::syntax::*;
 use crate::trace::*;
 use itertools::Itertools;
@@ -74,26 +76,34 @@ impl SkeletonTree {
     /// After being generated, a formula is checked under filtering criteria,
     /// and discarded if found to be equivalent to other formulae that have been or will included anyway.
     /// The const generic N represents the set of propositional variables which might appear in the generated formulae.
-    fn gen_formulae<const N: usize>(&self) -> Vec<SyntaxTree> {
-        self.gen_formulae_partial::<N>(true, true, true)
+    fn gen_formulae<const N: usize>(&self) -> Vec<Arc<SyntaxTree>> {
+        self.gen_formulae_partial::<N>(true, true, true, true)
     }
 
-    fn gen_formulae_partial<const N: usize>(&self, booleans: bool, and: bool, or: bool) -> Vec<SyntaxTree> {
+    fn gen_formulae_partial<const N: usize>(&self, tt: bool, ff: bool, and: bool, or: bool) -> Vec<Arc<SyntaxTree>> {
         match self {
             // Leaves of the `SkeletonTree` correspond to propositional variables
-            SkeletonTree::Leaf if booleans => [SyntaxTree::False, SyntaxTree::True].into_iter()
+            SkeletonTree::Leaf if tt && ff => [Arc::new(SyntaxTree::False), Arc::new(SyntaxTree::True)].into_iter()
                 .chain(
-                    (0..N).map(|n| SyntaxTree::Atom(n as Idx))
-                ).collect::<Vec<SyntaxTree>>(),
+                    (0..N).map(|n| Arc::new(SyntaxTree::Atom(n as Idx)))
+                ).collect::<Vec<Arc<SyntaxTree>>>(),
+            SkeletonTree::Leaf if tt && !ff => [Arc::new(SyntaxTree::True)].into_iter()
+                .chain(
+                    (0..N).map(|n| Arc::new(SyntaxTree::Atom(n as Idx)))
+                ).collect::<Vec<Arc<SyntaxTree>>>(),
+            SkeletonTree::Leaf if !tt && ff => [Arc::new(SyntaxTree::False)].into_iter()
+                .chain(
+                    (0..N).map(|n| Arc::new(SyntaxTree::Atom(n as Idx)))
+                ).collect::<Vec<Arc<SyntaxTree>>>(),
             SkeletonTree::Leaf => (0..N)
-                .map(|n| SyntaxTree::Atom(n as Idx))
-                .collect::<Vec<SyntaxTree>>(),
+                .map(|n| Arc::new(SyntaxTree::Atom(n as Idx)))
+                .collect::<Vec<Arc<SyntaxTree>>>(),
             // Unary nodes of the `SkeletonTree` correspond to unary operators of LTL
             SkeletonTree::UnaryNode(child) => {
                 child.gen_formulae::<N>()
                     .into_iter()
-                    .filter(check_next)
-                    .map(|child| SyntaxTree::Next(Box::new(child)))
+                    .filter(|branch| check_next(branch.as_ref()))
+                    .map(|child| Arc::new(SyntaxTree::Next(child)))
                     .collect()
 
                 // let children = child.gen_formulae::<N>();
@@ -138,8 +148,8 @@ impl SkeletonTree {
                 child.0.gen_formulae::<N>()
                     .into_iter()
                     .cartesian_product(child.1.gen_formulae::<N>().into_iter())
-                    .filter(check_until)
-                    .map(|children| SyntaxTree::Until(Box::new(children)))
+                    .filter(|(left_branch, right_branch)| check_until(left_branch.as_ref(), right_branch.as_ref()))
+                    .map(|children| Arc::new(SyntaxTree::Until(Arc::new((children.0.as_ref().clone(), children.1.as_ref().clone())))))
                     .collect()
 
                 // let left_children = child.0.gen_formulae::<N>();
@@ -181,18 +191,18 @@ impl SkeletonTree {
                             .dedup_with_count()
                             .map(|(multiplicity, skeleton)| {
                                 skeleton
-                                    .gen_formulae_partial::<N>(false, false, false)
+                                    .gen_formulae_partial::<N>(false, false, false, false)
                                     .into_iter()
                                     .combinations(multiplicity)
                             })
                             .multi_cartesian_product()
                             .filter_map(|tuples_of_subformulae| {
                                 let subformulae = tuples_of_subformulae.concat();
-                                // if check_and(&subformulae) {
-                                    Some(SyntaxTree::And(subformulae))
-                                // } else {
-                                //     None
-                                // }
+                                if check_and(&subformulae) {
+                                    Some(Arc::new(SyntaxTree::And(subformulae)))
+                                } else {
+                                    None
+                                }
                             }),
                     );
                 }
@@ -204,18 +214,18 @@ impl SkeletonTree {
                             .dedup_with_count()
                             .map(|(multiplicity, skeleton)| {
                                 skeleton
-                                    .gen_formulae_partial::<N>(true, true, false)
+                                    .gen_formulae_partial::<N>(true, false, true, false)
                                     .into_iter()
                                     .combinations(multiplicity)
                             })
                             .multi_cartesian_product()
                             .filter_map(|tuples_of_subformulae| {
                                 let subformulae = tuples_of_subformulae.concat();
-                                if check_xor(&subformulae) {
-                                    Some(SyntaxTree::XOr(subformulae))
-                                } else {
-                                    None
-                                }
+                                // if check_xor(&subformulae) {
+                                    Some(Arc::new(SyntaxTree::XOr(subformulae)))
+                                // } else {
+                                //     None
+                                // }
                             }),
                     );
                 }
@@ -252,6 +262,7 @@ pub fn par_brute_solve<const N: usize>(sample: &Sample<N>, log: bool) -> Option<
                 .into_iter()
                 .flat_map(|skeleton| skeleton.gen_formulae::<N>())
                 .find(|formula| sample.is_consistent(formula))
+                .map(|formula| formula.as_ref().clone())
         } else {
             SkeletonTree::gen(size)
                 .into_par_iter()
@@ -259,135 +270,43 @@ pub fn par_brute_solve<const N: usize>(sample: &Sample<N>, log: bool) -> Option<
                 // .find_map_any(|skeleton| skeleton.gen_formulae::<N>().into_iter().find(|formula| sample.is_consistent(formula)))
                 .flat_map(|skeleton| skeleton.gen_formulae::<N>())
                 .find_any(|formula| sample.is_consistent(formula))
+                .map(|formula| formula.as_ref().clone())
         }
     })
 }
 
-// fn check_not(child: &SyntaxTree) -> bool {
-//     match child {
-//         // ¬¬φ ≡ φ
-//         SyntaxTree::Unary { op: UnaryOp::Not, .. }
-//         // ¬(φ -> ψ) ≡ φ ∧ ¬ψ
-//         | SyntaxTree::Binary { op: BinaryOp::Implies, .. } => false,
-//         // ¬(¬φ ∨ ψ) ≡ φ ∧ ¬ψ
-//         SyntaxTree::Binary { op: BinaryOp::Or, children }
-//         // ¬(¬φ ∧ ψ) ≡ φ ∨ ¬ψ
-//         | SyntaxTree::Binary { op: BinaryOp::And, children } if matches!(children.0, SyntaxTree::Unary { op: UnaryOp::Not, .. }) => false,
-//         // ¬(φ ∨ ¬ψ) ≡ ¬φ ∧ ψ
-//         SyntaxTree::Binary { op: BinaryOp::Or, children }
-//         // ¬(φ ∧ ¬ψ) ≡ ¬φ ∨ ψ
-//         | SyntaxTree::Binary { op: BinaryOp::And, children } if matches!(children.1, SyntaxTree::Unary { op: UnaryOp::Not, .. }) => false,
-//         _ => true,
-//     }
-// }
+
+// Knuth-Bendix completion
+// computed by https://smimram.github.io/ocaml-alg/kb/
+
+// R1 : xor(x,ff()) -> x
+// R2 : xor(x,x) -> ff()
+// R3 : and(x,tt()) -> x
+// R4 : and(x,ff()) -> ff()
+// R5 : and(x,xor(y,z)) -> xor(and(x,y),and(x,z))
+// R6 : next(tt()) -> tt()
+// R7 : next(ff()) -> ff()
+// R8 : next(xor(x,y)) -> xor(next(x),next(y))
+// R9 : next(and(x,y)) -> and(next(x),next(y))
+// R10 : next(until(x,y)) -> until(next(x),next(y))
+// R11 : until(x,ff()) -> ff()
+// R12 : and(until(x,y),until(z,y)) -> until(and(x,z),y)
+// R13 : until(x,tt()) -> tt()
 
 fn check_next(child: &SyntaxTree) -> bool {
-    !matches!(
+    matches!(
         child,
-        // X False ≡ False, X True ≡ True
-        SyntaxTree::True
-        | SyntaxTree::False
-        // X (x + y) -> Xx + Xy
-        // X (x /\ y) -> Xx /\ Xy
-        // X (x U y) -> Xx U Xy
-        | SyntaxTree::Until(_)
-        | SyntaxTree::And(_)
-        | SyntaxTree::XOr(_)
+        SyntaxTree::Atom(_)
     )
 }
 
-// fn check_globally(child: &SyntaxTree) -> bool {
-//     !matches!(
-//         child,
-//         // G G φ <=> G φ
-//         SyntaxTree::Unary { op: UnaryOp::Globally, .. }
-//         // X G φ ≡ G X φ
-//         | SyntaxTree::Unary { op: UnaryOp::Next, .. }
-//         // ¬ F φ ≡ G ¬ φ
-//         | SyntaxTree::Unary { op: UnaryOp::Finally, .. } // // G False ≡ False
-//                                                          // | SyntaxTree::Zeroary { op: ZeroaryOp::False }
-//     )
-// }
-
-// fn check_finally(child: &SyntaxTree) -> bool {
-//     !matches!(
-//         child,
-//         // F F φ <=> F φ
-//         SyntaxTree::Unary { op: UnaryOp::Finally, .. }
-//         // X F φ ≡ F X φ
-//         | SyntaxTree::Unary { op: UnaryOp::Globally, .. } // // F False ≡ False
-//                                                           // | SyntaxTree::Zeroary { op: ZeroaryOp::False }
-//     )
-// }
-
-// fn check_and((left_child, right_child): &(SyntaxTree, SyntaxTree)) -> bool {
-//     // Commutative law
-//     left_child < right_child
-//         && match (left_child, right_child) {
-//         // 0 /\ x -> 0, 1 /\ x -> x
-//         (SyntaxTree::Zeroary(_), _)
-//         // x /\ 0 -> 0, x /\ 1 -> x
-//         | (_, SyntaxTree::Zeroary(_))
-//         // //  Excluded middle
-//         // (child, SyntaxTree::Unary { op: UnaryOp::Not, child: neg_child })
-//         // |(SyntaxTree::Unary { op: UnaryOp::Not, child: neg_child }, child) if child == neg_child.as_ref() => false,
-//         // // // Domination law
-//         // // (.., SyntaxTree::Zeroary { op: ZeroaryOp::False })
-//         // // | (SyntaxTree::Zeroary { op: ZeroaryOp::False }, ..)
-//         // Associative laws
-//         | (SyntaxTree::Binary { op: BinaryOp::And, .. }, ..) => false,
-//         // // De Morgan's laws
-//         // | (SyntaxTree::Unary { op: UnaryOp::Not, .. }, SyntaxTree::Unary { op: UnaryOp::Not, .. })
-//         // // X (φ ∧ ψ) ≡ (X φ) ∧ (X ψ)
-//         // | (SyntaxTree::Unary { op: UnaryOp::Next, .. }, SyntaxTree::Unary { op: UnaryOp::Next, .. }) => false,
-//         // // G (φ ∧ ψ)≡ (G φ) ∧ (G ψ)
-//         // | (SyntaxTree::Unary { op: UnaryOp::Globally, .. }, SyntaxTree::Unary { op: UnaryOp::Globally, .. }) => false,
-//         // // (φ -> ψ_1) ∧ (φ -> ψ_2) ≡ φ -> (ψ_1 ∧ ψ_2)
-//         // // (φ_1 -> ψ) ∧ (φ_2 -> ψ) ≡ (φ_1 ∨ φ_2) -> ψ
-//         // (SyntaxTree::Binary { op: BinaryOp::Implies, children: c_1 }, SyntaxTree::Binary { op: BinaryOp::Implies, children: c_2 }) if c_1.0 == c_2.0 || c_1.1 == c_2.1 => false,
-//         // // (φ_1 U ψ) ∧ (φ_2 U ψ) ≡ (φ_1 ∧ φ_2) U ψ left_child: l_1
-//         // (SyntaxTree::Binary { op: BinaryOp::Until, children: c_1 }, SyntaxTree::Binary { op: BinaryOp::Until, children: c_2, .. }) if c_1.1 == c_2.1 => false,
-//         // // Absorption laws
-//         // (SyntaxTree::Binary { op: BinaryOp::Or, children: c_1 }, right_child) if c_1.0 == *right_child || c_1.1 == *right_child => false,
-//         // (left_child, SyntaxTree::Binary { op: BinaryOp::Or, children }) if children.0 == *left_child || children.1 == *left_child => false,
-//         // // Distributive laws
-//         // (SyntaxTree::Binary { op: BinaryOp::Or, children: c_1 }, SyntaxTree::Binary { op: BinaryOp::Or, children: c_2 }) if c_1.0 == c_2.0 || c_1.0 == c_2.1 || c_1.1 == c_2.0 || c_1.1 == c_2.1 => false,
-//         // // G φ ≡ φ ∧ X(G φ)
-//         // (
-//         //     left_child,
-//         //     SyntaxTree::Unary {
-//         //         op: UnaryOp::Next,
-//         //         child,
-//         //     }
-//         // ) => if let SyntaxTree::Unary { op: UnaryOp::Globally, child } = child.as_ref() {
-//         //     child.as_ref() != left_child
-//         // } else {
-//         //     true
-//         // },
-//         // // G φ ≡ X(G φ) ∧ φ
-//         // (
-//         //     SyntaxTree::Unary {
-//         //         op: UnaryOp::Next,
-//         //         child,
-//         //     },
-//         //     right_child,
-//         // ) => if let SyntaxTree::Unary { op: UnaryOp::Globally, child } = child.as_ref() {
-//         //     child.as_ref() != right_child
-//         // } else {
-//         //     true
-//         // },
-//         _ => {
-//             // x /\ (y + z) -> x + y /\ x + z
-//             if let SyntaxTree::Binary { op: BinaryOp::XOr, .. } = left_child {
-//                 return false;
-//             }
-//             // x /\ x -> x
-//             // HARD: x could be any subformula of left- and right-hand-side!
-//             let right_and_terms = list_and_terms(right_child);
-//             !list_and_terms(left_child).iter().any(|and_term| right_and_terms.contains(and_term))
-//         }
-//     }
-// }
+fn check_and_bin(left_child: &SyntaxTree, right_child: &SyntaxTree) -> bool {
+    match (left_child, right_child) {
+        // (φ_1 U ψ) ∧ (φ_2 U ψ) ≡ (φ_1 ∧ φ_2) U ψ left_child: l_1
+        (SyntaxTree::Until(c_1), SyntaxTree::Until(c_2)) if c_1.1 == c_2.1 => false,
+        _ => true,
+    }
+}
 
 // fn check_or((left_child, right_child): &(SyntaxTree, SyntaxTree)) -> bool {
 //     // Commutative law
@@ -545,33 +464,13 @@ fn check_next(child: &SyntaxTree) -> bool {
 //     )
 // }
 
-fn check_until((left_child, right_child): &(SyntaxTree, SyntaxTree)) -> bool {
+fn check_until(left_child: &SyntaxTree, right_child: &SyntaxTree) -> bool {
     // φ U φ ≡ φ
     left_child != right_child
         && match (left_child, right_child) {
-            // // φ U False ≡ G φ
-            // (
-            //     ..,
-            //     SyntaxTree::Zeroary {
-            //         op: ZeroaryOp::False
-            //     },
-            // )
-            // // False U φ ≡ φ
-            // | (
-            //     SyntaxTree::Zeroary {
-            //         op: ZeroaryOp::False
-            //     },
-            //     ..
-            // )
-            // // X (φ U ψ) ≡ (X φ) U (X ψ)
-            // (
-            //     SyntaxTree::Unary {
-            //         op: UnaryOp::Next, ..
-            //     },
-            //     SyntaxTree::Unary {
-            //         op: UnaryOp::Next, ..
-            //     },
-            // ) => false,
+            (_, SyntaxTree::True | SyntaxTree::False)
+            // False U φ ≡ φ
+            | (SyntaxTree::False, _) => false,
             // φ U ψ ≡ φ U (φ U ψ)
             (
                 left_child,
@@ -581,13 +480,13 @@ fn check_until((left_child, right_child): &(SyntaxTree, SyntaxTree)) -> bool {
         }
 }
 
-fn check_xor(branches: &[SyntaxTree]) -> bool {
-    branches.iter().all(|branch| !matches!(branch, SyntaxTree::False))
-}
-
-// fn check_and(branches: &[SyntaxTree]) -> bool {
-//     branches.iter().all(|branch| !matches!(branch, SyntaxTree::True | SyntaxTree::False))
+// fn check_xor(branches: &[SyntaxTree]) -> bool {
+//     branches.iter().all(|branch| !matches!(branch, SyntaxTree::False))
 // }
+
+fn check_and(branches: &[Arc<SyntaxTree>]) -> bool {
+    branches.iter().tuple_combinations().all(|(left_branch, right_branch)| check_and_bin(left_branch, right_branch))
+}
 
 // TODO: write tests for checks
 #[cfg(test)]
