@@ -149,7 +149,7 @@ impl SkeletonTree {
                     .into_iter()
                     .cartesian_product(child.1.gen_formulae::<N>().into_iter())
                     .filter(|(left_branch, right_branch)| check_until(left_branch.as_ref(), right_branch.as_ref()))
-                    .map(|children| Arc::new(SyntaxTree::Until(Arc::new((children.0.as_ref().clone(), children.1.as_ref().clone())))))
+                    .map(|children| Arc::new(SyntaxTree::Until(children.0, children.1)))
                     .collect()
 
                 // let left_children = child.0.gen_formulae::<N>();
@@ -303,7 +303,7 @@ fn check_next(child: &SyntaxTree) -> bool {
 fn check_and_bin(left_child: &SyntaxTree, right_child: &SyntaxTree) -> bool {
     match (left_child, right_child) {
         // (φ_1 U ψ) ∧ (φ_2 U ψ) ≡ (φ_1 ∧ φ_2) U ψ left_child: l_1
-        (SyntaxTree::Until(c_1), SyntaxTree::Until(c_2)) if c_1.1 == c_2.1 => false,
+        (SyntaxTree::Until(_, c_1), SyntaxTree::Until(_, c_2)) if c_1 == c_2 => false,
         _ => true,
     }
 }
@@ -474,8 +474,8 @@ fn check_until(left_child: &SyntaxTree, right_child: &SyntaxTree) -> bool {
             // φ U ψ ≡ φ U (φ U ψ)
             (
                 left_child,
-                SyntaxTree::Until(children),
-            ) if *left_child == children.0 => false,
+                SyntaxTree::Until(branch, _),
+            ) if left_child == branch.as_ref() => false,
             _ => true,
         }
 }
@@ -531,6 +531,20 @@ mod learn {
                 .flat_map(|skeleton| skeleton.gen_formulae::<VARS>())
                 .count();
             println!("Formulae of size {size}: {formulae} ({VARS} vars)");
+        }
+    }
+
+    #[test]
+    pub fn print_formulae() {
+        const VARS: usize = 2;
+
+        for size in 1..5 {
+            for formula in SkeletonTree::gen(size)
+                .into_iter()
+                .flat_map(|skeleton| skeleton.gen_formulae::<VARS>())
+            {
+                println!("{formula}");
+            }
         }
     }
 }

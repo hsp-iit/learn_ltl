@@ -10,7 +10,7 @@ pub enum SyntaxTree {
     True,
     False,
     Next(Arc<SyntaxTree>),
-    Until(Arc<(SyntaxTree, SyntaxTree)>),
+    Until(Arc<SyntaxTree>, Arc<SyntaxTree>),
     And(Vec<Arc<SyntaxTree>>),
     XOr(Vec<Arc<SyntaxTree>>),
 }
@@ -22,8 +22,8 @@ impl fmt::Display for SyntaxTree {
             SyntaxTree::True => write!(f, "T"),
             SyntaxTree::False => write!(f, "F"),
             SyntaxTree::Next(branch) => write!(f, "X({branch})"),
-            SyntaxTree::Until(children) => {
-                write!(f, "({})U({})", children.0, children.1)
+            SyntaxTree::Until(left_branch, right_branch) => {
+                write!(f, "({})U({})", left_branch, right_branch)
             }
             SyntaxTree::And(branches) => {
                 if let Some(branch) = branches.first() {
@@ -53,7 +53,7 @@ impl SyntaxTree {
             SyntaxTree::Atom(n) => *n + 1,
             SyntaxTree::True | SyntaxTree::False => 0,
             SyntaxTree::Next(child) => child.as_ref().vars(),
-            SyntaxTree::Until(children) => children.0.vars().max(children.1.vars()),
+            SyntaxTree::Until(left_branch, right_branch) => left_branch.vars().max(right_branch.vars()),
             SyntaxTree::And(branches) | SyntaxTree::XOr(branches) => branches.iter().map(|branch| branch.vars()).max().unwrap_or(0),
         }
     }
@@ -82,8 +82,8 @@ impl SyntaxTree {
                 // UnaryOp::FinallyLeq(time) => {
                 //     (0..(time as usize + 1).min(trace.len())).any(|t| child.eval(&trace[t..]))
                 // }
-            SyntaxTree::Until(children) => {
-                !trace.is_empty() && ( children.1.eval(trace) || ( children.0.eval(trace) && self.eval(&trace[1..]) ) )
+            SyntaxTree::Until(left_branch, right_branch) => {
+                !trace.is_empty() && ( right_branch.eval(trace) || ( left_branch.eval(trace) && self.eval(&trace[1..]) ) )
 
                 // for t in 0..trace.len() {
                 //     let t_trace = &trace[t..];
@@ -255,7 +255,7 @@ mod eval {
 
     #[test]
     fn until() {
-        let formula = SyntaxTree::Until(Arc::new((ATOM_0, ATOM_1)));
+        let formula = SyntaxTree::Until(Arc::new(ATOM_0), Arc::new(ATOM_1));
 
         let trace = [[true, false], [false, true], [false, false]];
         assert!(formula.eval(&trace));
