@@ -105,43 +105,6 @@ impl SkeletonTree {
                     .filter(|branch| check_next(branch.as_ref()))
                     .map(|child| Arc::new(SyntaxTree::Next(child)))
                     .collect()
-
-                // let children = child.gen_formulae::<N>();
-                // // Use known bounds to allocate just as much memory as needed and avoid reallocations.
-                // let mut trees = Vec::with_capacity(4 * children.len());
-
-                // for child in children {
-                //     let child = Box::new(child);
-
-                //     // if check_not(child.as_ref()) {
-                //     //     trees.push(SyntaxTree::Unary {
-                //     //         op: UnaryOp::Not,
-                //     //         child: child.clone(),
-                //     //     });
-                //     // }
-
-                //     if check_next(child.as_ref()) {
-                //         trees.push(SyntaxTree::Next(child));
-                //     }
-
-                //     // if check_globally(child.as_ref()) {
-                //     //     trees.push(SyntaxTree::Unary {
-                //     //         op: UnaryOp::Globally,
-                //     //         child: child.clone(),
-                //     //     });
-                //     // }
-
-                //     // if check_finally(child.as_ref()) {
-                //     //     trees.push(SyntaxTree::Unary {
-                //     //         op: UnaryOp::Finally,
-                //     //         child,
-                //     //     });
-                //     // }
-                // }
-
-                // trees.shrink_to_fit();
-
-                // trees
             }
             // Binary nodes of the `SkeletonTree` correspond to binary operators of LTL
             SkeletonTree::BinaryNode(child) => {
@@ -151,33 +114,6 @@ impl SkeletonTree {
                     .filter(|(left_branch, right_branch)| check_until(left_branch.as_ref(), right_branch.as_ref()))
                     .map(|children| Arc::new(SyntaxTree::Until(children.0, children.1)))
                     .collect()
-
-                // let left_children = child.0.gen_formulae::<N>();
-                // let right_children = child.1.gen_formulae::<N>();
-                // // Use known bounds to allocate just as much memory as needed and avoid reallocations.
-                // let mut trees = Vec::with_capacity(2 * left_children.len() * right_children.len());
-                // let children = left_children
-                //     .into_iter()
-                //     .cartesian_product(right_children.into_iter());
-
-                // for (left_child, right_child) in children {
-                //     let children = Box::new((left_child, right_child));
-
-                //     // if check_implies(children.as_ref()) {
-                //     //     trees.push(SyntaxTree::Binary {
-                //     //         op: BinaryOp::Implies,
-                //     //         children: children.clone(),
-                //     //     });
-                //     // }
-
-                //     if check_until(children.as_ref()) {
-                //         trees.push(SyntaxTree::Until(children));
-                //     }
-                // }
-
-                // trees.shrink_to_fit();
-
-                // trees
             }
             SkeletonTree::ASNode(leaves) => {
                 use itertools::*;
@@ -221,11 +157,11 @@ impl SkeletonTree {
                             .multi_cartesian_product()
                             .filter_map(|tuples_of_subformulae| {
                                 let subformulae = tuples_of_subformulae.concat();
-                                // if check_xor(&subformulae) {
+                                if check_xor(&subformulae) {
                                     Some(Arc::new(SyntaxTree::XOr(subformulae)))
-                                // } else {
-                                //     None
-                                // }
+                                } else {
+                                    None
+                                }
                             }),
                     );
                 }
@@ -235,18 +171,6 @@ impl SkeletonTree {
         }
     }
 }
-
-// pub fn brute_solve<const N: usize>(sample: &Sample<N>, log: bool) -> Option<SyntaxTree> {
-//     (1..).into_iter().find_map(|size| {
-//         if log {
-//             println!("Searching formulae of size {}", size);
-//         }
-//         SkeletonTree::gen(size)
-//             .into_iter()
-//             .flat_map(|skeleton| skeleton.gen_formulae::<N>())
-//             .find(|formula| sample.is_consistent(formula))
-//     })
-// }
 
 // Parallel search is faster but less consistent then single-threaded search
 pub fn par_brute_solve<const N: usize>(sample: &Sample<N>, log: bool) -> Option<SyntaxTree> {
@@ -290,8 +214,18 @@ pub fn par_brute_solve<const N: usize>(sample: &Sample<N>, log: bool) -> Option<
 // R9 : next(and(x,y)) -> and(next(x),next(y))
 // R10 : next(until(x,y)) -> until(next(x),next(y))
 // R11 : until(x,ff()) -> ff()
-// R12 : and(until(x,y),until(z,y)) -> until(and(x,z),y)
-// R13 : until(x,tt()) -> tt()
+// R12 : until(x,tt()) -> tt()
+// R13 : until(ff(),x) -> x
+// R14 : until(x,x) -> x
+// R15 : until(x, until(x, y)) → until(x, y)
+// R16 : until(until(x, y), y) → until(x, y)
+
+// Equivalences that cannot be turned into reduction rules
+
+// E1: p U q ≡ q ∨ (p ∧ X(p U q)) (Axiom, Expansion of U) // PROBLEM: X(p U q) not reduced // PROBLEM: OR, not XOR
+// E2: (x U y) ∧ (z U y)) -> (x ∧ z) U y
+// E3: xor(x, until(x, y)) ≡ xor(x, y)
+// E4: (p U q) ∧ q ≡ q
 
 fn check_next(child: &SyntaxTree) -> bool {
     matches!(
@@ -308,134 +242,135 @@ fn check_and_bin(left_child: &SyntaxTree, right_child: &SyntaxTree) -> bool {
     }
 }
 
-// fn check_or((left_child, right_child): &(SyntaxTree, SyntaxTree)) -> bool {
-//     // Commutative law
-//     left_child < right_child
-//         && match (left_child, right_child) {
-//         //  Excluded middle
-//         (child, SyntaxTree::Unary { op: UnaryOp::Not, child: neg_child })
-//         |(SyntaxTree::Unary { op: UnaryOp::Not, child: neg_child }, child) if child == neg_child.as_ref() => false,
-//         // // Identity law
-//         // (.., SyntaxTree::Zeroary { op: ZeroaryOp::False })
-//         // | (SyntaxTree::Zeroary { op: ZeroaryOp::False }, ..)
-//         // Associative laws
-//         | (SyntaxTree::Binary { op: BinaryOp::Or, .. }, ..)
-//         // // De Morgan's laws
-//         // | (SyntaxTree::Unary { op: UnaryOp::Not, .. }, SyntaxTree::Unary { op: UnaryOp::Not, .. })
-//         // ¬φ ∨ ψ ≡ φ -> ψ, subsumes De Morgan's laws
-//         | (SyntaxTree::Unary { op: UnaryOp::Not, .. }, ..)
-//         // X (φ ∨ ψ) ≡ (X φ) ∨ (X ψ)
-//         | (SyntaxTree::Unary { op: UnaryOp::Next, .. }, SyntaxTree::Unary { op: UnaryOp::Next, .. })
-//         // F (φ ∨ ψ) ≡ (F φ) ∨ (F ψ)
-//         | (SyntaxTree::Unary { op: UnaryOp::Finally, .. }, SyntaxTree::Unary { op: UnaryOp::Finally, .. }) => false,
-//         // (φ -> ψ_1) ∨ (φ -> ψ_2) ≡ φ -> (ψ_1 ∨ ψ_2)
-//         // (φ_1 -> ψ) ∨ (φ_2 -> ψ) ≡ (φ_1 ∧ φ_2) -> ψ
-//         (SyntaxTree::Binary { op: BinaryOp::Implies, children: c_1 }, SyntaxTree::Binary { op: BinaryOp::Implies, children: c_2 }) if c_1.0 == c_2.0 || c_1.1 == c_2.1 => false,
-//         // (φ U ψ_1) ∨ (φ U ψ_2) ≡ φ U (ψ_1 ∨ ψ_2)
-//         (SyntaxTree::Binary { op: BinaryOp::Until, children: c_1 }, SyntaxTree::Binary { op: BinaryOp::Until, children: c_2 }) if c_1.0 == c_2.0 => false,
-//         // Absorption laws
-//         (SyntaxTree::Binary { op: BinaryOp::And, children }, right_child) if children.0 == *right_child || children.1 == *right_child => false,
-//         (left_child, SyntaxTree::Binary { op: BinaryOp::And, children }) if children.0 == *left_child || children.1 == *left_child => false,
-//         // Distributive laws
-//         (SyntaxTree::Binary { op: BinaryOp::And, children: c_1 }, SyntaxTree::Binary { op: BinaryOp::And, children: c_2 }) if c_1.0 == c_2.0 || c_1.0 == c_2.1 || c_1.1 == c_2.0 || c_1.1 == c_2.1 => false,
-//         // F φ ≡ φ ∨ X(F φ)
-//         (
-//             left_child,
-//             SyntaxTree::Unary {
-//                 op: UnaryOp::Next,
-//                 child,
-//             }
-//         ) => if let SyntaxTree::Unary { op: UnaryOp::Finally, child } = child.as_ref() {
-//             child.as_ref() != left_child
-//         } else {
-//             true
-//         },
-//         // F φ ≡ X(F φ) ∨ φ
-//         (
-//             SyntaxTree::Unary {
-//                 op: UnaryOp::Next,
-//                 child,
-//             },
-//             right_child,
-//         ) => if let SyntaxTree::Unary { op: UnaryOp::Finally, child } = child.as_ref() {
-//             child.as_ref() != right_child
-//         } else {
-//             true
-//         },
-//         // φ U ψ ≡ ψ ∨ ( φ ∧ X(φ U ψ) )
-//         // φ U ψ ≡ ψ ∨ ( X(φ U ψ) ∧ φ )
-//         (
-//             left_child,
-//             SyntaxTree::Binary {
-//                 op: BinaryOp::And,
-//                 children: c_1,
-//             }
-//         ) => if let SyntaxTree::Unary {
-//                 op: UnaryOp::Next,
-//                 child,
-//             } = &c_1.1 {
-//                 if let SyntaxTree::Binary {
-//                     op: BinaryOp::Until,
-//                     children: c_2,
-//                 } = child.as_ref() {
-//                     !(*left_child == c_2.1 && c_1.0 == c_2.0)
-//             } else if let SyntaxTree::Unary {
-//                 op: UnaryOp::Next,
-//                 child,
-//             } = &c_1.0 {
-//                 if let SyntaxTree::Binary {
-//                     op: BinaryOp::Until,
-//                     children: c_2,
-//                 } = child.as_ref() {
-//                     !(*left_child == c_2.1 && c_1.1 == c_2.0)
-//                 } else {
-//                     true
-//                 }
-//             } else {
-//                 true
-//             }
-//         } else {
-//             true
-//         }
-//         // φ U ψ ≡ ( φ ∧ X(φ U ψ) ) ∨ ψ
-//         // φ U ψ ≡ ( X(φ U ψ) ∧ φ ) ∨ ψ
-//         (
-//             SyntaxTree::Binary {
-//                 op: BinaryOp::And,
-//                 children: c_1,
-//             },
-//             right_child
-//         ) => if let SyntaxTree::Unary {
-//                 op: UnaryOp::Next,
-//                 child,
-//             } = &c_1.1 {
-//                 if let SyntaxTree::Binary {
-//                     op: BinaryOp::Until,
-//                     children: c_2,
-//                 } = child.as_ref() {
-//                     !(*right_child == c_2.1 && c_1.0 == c_2.0)
-//             // // Made useless by commutativity optimization on ∧
-//             } else if let SyntaxTree::Unary {
-//                 op: UnaryOp::Next,
-//                 child,
-//             } = &c_1.0 {
-//                 if let SyntaxTree::Binary {
-//                     op: BinaryOp::Until,
-//                     children: c_2,
-//                 } = child.as_ref() {
-//                     !(*right_child == c_2.1 && c_1.1 == c_2.0)
-//                 } else {
-//                     true
-//                 }
-//             } else {
-//                 true
-//             }
-//         } else {
-//             true
-//         }
-//         _ => true,
-//     }
-// }
+fn check_xor_bin(left_child: &SyntaxTree, right_child: &SyntaxTree) -> bool {
+    match (left_child, right_child) {
+        // //  Excluded middle
+        // (child, SyntaxTree::Unary { op: UnaryOp::Not, child: neg_child })
+        // |(SyntaxTree::Unary { op: UnaryOp::Not, child: neg_child }, child) if child == neg_child.as_ref() => false,
+        // // // Identity law
+        // // (.., SyntaxTree::Zeroary { op: ZeroaryOp::False })
+        // // | (SyntaxTree::Zeroary { op: ZeroaryOp::False }, ..)
+        // // Associative laws
+        // | (SyntaxTree::Binary { op: BinaryOp::Or, .. }, ..)
+        // // // De Morgan's laws
+        // // | (SyntaxTree::Unary { op: UnaryOp::Not, .. }, SyntaxTree::Unary { op: UnaryOp::Not, .. })
+        // // ¬φ ∨ ψ ≡ φ -> ψ, subsumes De Morgan's laws
+        // | (SyntaxTree::Unary { op: UnaryOp::Not, .. }, ..)
+        // // X (φ ∨ ψ) ≡ (X φ) ∨ (X ψ)
+        // | (SyntaxTree::Unary { op: UnaryOp::Next, .. }, SyntaxTree::Unary { op: UnaryOp::Next, .. })
+        // // F (φ ∨ ψ) ≡ (F φ) ∨ (F ψ)
+        // | (SyntaxTree::Unary { op: UnaryOp::Finally, .. }, SyntaxTree::Unary { op: UnaryOp::Finally, .. }) => false,
+        // // (φ -> ψ_1) ∨ (φ -> ψ_2) ≡ φ -> (ψ_1 ∨ ψ_2)
+        // // (φ_1 -> ψ) ∨ (φ_2 -> ψ) ≡ (φ_1 ∧ φ_2) -> ψ
+        // (SyntaxTree::Binary { op: BinaryOp::Implies, children: c_1 }, SyntaxTree::Binary { op: BinaryOp::Implies, children: c_2 }) if c_1.0 == c_2.0 || c_1.1 == c_2.1 => false,
+        // // (φ U ψ_1) ∨ (φ U ψ_2) ≡ φ U (ψ_1 ∨ ψ_2)
+        // (SyntaxTree::Binary { op: BinaryOp::Until, children: c_1 }, SyntaxTree::Binary { op: BinaryOp::Until, children: c_2 }) if c_1.0 == c_2.0 => false,
+        // // Absorption laws
+        // (SyntaxTree::Binary { op: BinaryOp::And, children }, right_child) if children.0 == *right_child || children.1 == *right_child => false,
+        // (left_child, SyntaxTree::Binary { op: BinaryOp::And, children }) if children.0 == *left_child || children.1 == *left_child => false,
+        // // Distributive laws
+        // (SyntaxTree::Binary { op: BinaryOp::And, children: c_1 }, SyntaxTree::Binary { op: BinaryOp::And, children: c_2 }) if c_1.0 == c_2.0 || c_1.0 == c_2.1 || c_1.1 == c_2.0 || c_1.1 == c_2.1 => false,
+        // // F φ ≡ φ ∨ X(F φ)
+        // (
+        //     left_child,
+        //     SyntaxTree::Unary {
+        //         op: UnaryOp::Next,
+        //         child,
+        //     }
+        // ) => if let SyntaxTree::Unary { op: UnaryOp::Finally, child } = child.as_ref() {
+        //     child.as_ref() != left_child
+        // } else {
+        //     true
+        // },
+        // // F φ ≡ X(F φ) ∨ φ
+        // (
+        //     SyntaxTree::Unary {
+        //         op: UnaryOp::Next,
+        //         child,
+        //     },
+        //     right_child,
+        // ) => if let SyntaxTree::Unary { op: UnaryOp::Finally, child } = child.as_ref() {
+        //     child.as_ref() != right_child
+        // } else {
+        //     true
+        // },
+        // φ U ψ ≡ ψ ∨ ( φ ∧ X(φ U ψ) )
+        (
+            left_child,
+            SyntaxTree::And(children)
+        ) => {
+            !children.iter().any(|phi| children.contains(&Arc::new(SyntaxTree::Next(Arc::new(SyntaxTree::Until(phi.clone(), Arc::new(left_child.clone())))))))
+        }
+        // φ U ψ ≡ ( φ ∧ X(φ U ψ) ) ∨ ψ
+        (
+            SyntaxTree::And(children),
+            right_child,
+        ) => {
+            !children.iter().any(|phi| children.contains(&Arc::new(SyntaxTree::Next(Arc::new(SyntaxTree::Until(phi.clone(), Arc::new(right_child.clone())))))))
+        }
+        // let SyntaxTree::Next(child) = &c_1.1 {
+        //         if let SyntaxTree::Binary {
+        //             op: BinaryOp::Until,
+        //             children: c_2,
+        //         } = child.as_ref() {
+        //             !(*left_child == c_2.1 && c_1.0 == c_2.0)
+        //     } else if let SyntaxTree::Unary {
+        //         op: UnaryOp::Next,
+        //         child,
+        //     } = &c_1.0 {
+        //         if let SyntaxTree::Binary {
+        //             op: BinaryOp::Until,
+        //             children: c_2,
+        //         } = child.as_ref() {
+        //             !(*left_child == c_2.1 && c_1.1 == c_2.0)
+        //         } else {
+        //             true
+        //         }
+        //     } else {
+        //         true
+        //     }
+        // } else {
+        //     true
+        // }
+        // φ U ψ ≡ ( φ ∧ X(φ U ψ) ) ∨ ψ
+        // φ U ψ ≡ ( X(φ U ψ) ∧ φ ) ∨ ψ
+        // (
+        //     SyntaxTree::Binary {
+        //         op: BinaryOp::And,
+        //         children: c_1,
+        //     },
+        //     right_child
+        // ) => if let SyntaxTree::Unary {
+        //         op: UnaryOp::Next,
+        //         child,
+        //     } = &c_1.1 {
+        //         if let SyntaxTree::Binary {
+        //             op: BinaryOp::Until,
+        //             children: c_2,
+        //         } = child.as_ref() {
+        //             !(*right_child == c_2.1 && c_1.0 == c_2.0)
+        //     // // Made useless by commutativity optimization on ∧
+        //     } else if let SyntaxTree::Unary {
+        //         op: UnaryOp::Next,
+        //         child,
+        //     } = &c_1.0 {
+        //         if let SyntaxTree::Binary {
+        //             op: BinaryOp::Until,
+        //             children: c_2,
+        //         } = child.as_ref() {
+        //             !(*right_child == c_2.1 && c_1.1 == c_2.0)
+        //         } else {
+        //             true
+        //         }
+        //     } else {
+        //         true
+        //     }
+        // } else {
+        //     true
+        // }
+        _ => true,
+    }
+}
 
 // fn check_implies((left_child, right_child): &(SyntaxTree, SyntaxTree)) -> bool {
 //     !matches!(
@@ -476,16 +411,23 @@ fn check_until(left_child: &SyntaxTree, right_child: &SyntaxTree) -> bool {
                 left_child,
                 SyntaxTree::Until(branch, _),
             ) if left_child == branch.as_ref() => false,
+            // φ U ψ ≡ (φ U ψ) U ψ
+            (
+                SyntaxTree::Until(_, branch),
+                right_child,
+            ) if right_child == branch.as_ref() => false,
             _ => true,
         }
 }
 
-// fn check_xor(branches: &[SyntaxTree]) -> bool {
-//     branches.iter().all(|branch| !matches!(branch, SyntaxTree::False))
-// }
+fn check_xor(branches: &[Arc<SyntaxTree>]) -> bool {
+    // branches.iter().tuple_combinations().all(|(left_branch, right_branch)| check_xor_bin(left_branch, right_branch))
+    !branches.iter().any(|branch| if let SyntaxTree::Until(lhs, _) = branch.as_ref() { branches.contains(lhs) } else { false })
+}
 
 fn check_and(branches: &[Arc<SyntaxTree>]) -> bool {
     branches.iter().tuple_combinations().all(|(left_branch, right_branch)| check_and_bin(left_branch, right_branch))
+    && !branches.iter().any(|branch| if let SyntaxTree::Until(_, rhs) = branch.as_ref() { branches.contains(rhs) } else { false })
 }
 
 // TODO: write tests for checks
