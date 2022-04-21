@@ -115,8 +115,8 @@ impl SyntaxTree {
                 //     branch.eval(&trace[1..])
                 // }
             }
-            SyntaxTree::Globally(branch) => (0..trace.len()).all(|t| branch.eval(&trace[t..])),
-            SyntaxTree::Finally(branch) => (0..trace.len()).any(|t| branch.eval(&trace[t..])),
+            SyntaxTree::Globally(branch) => (0..trace.len()).rev().all(|t| branch.eval(&trace[t..])),
+            SyntaxTree::Finally(branch) => (0..trace.len()).rev().any(|t| branch.eval(&trace[t..])),
             SyntaxTree::And(branches) => {
                 let (left_branch, right_branch) = branches.as_ref();
                 left_branch.eval(trace) && right_branch.eval(trace)
