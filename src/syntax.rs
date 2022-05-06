@@ -57,10 +57,10 @@ pub enum SyntaxTree {
     Next(Arc<SyntaxTree>),
     Globally(Arc<SyntaxTree>),
     Finally(Arc<SyntaxTree>),
-    And(Arc<(SyntaxTree, SyntaxTree)>),
-    Or(Arc<(SyntaxTree, SyntaxTree)>),
-    Implies(Arc<(SyntaxTree, SyntaxTree)>),
-    Until(Arc<(SyntaxTree, SyntaxTree)>),
+    And(Arc<SyntaxTree>, Arc<SyntaxTree>),
+    Or(Arc<SyntaxTree>, Arc<SyntaxTree>),
+    Implies(Arc<SyntaxTree>, Arc<SyntaxTree>),
+    Until(Arc<SyntaxTree>, Arc<SyntaxTree>),
 }
 
 impl fmt::Display for SyntaxTree {
@@ -71,10 +71,18 @@ impl fmt::Display for SyntaxTree {
             SyntaxTree::Next(branch) => write!(f, "X({})", branch),
             SyntaxTree::Globally(branch) => write!(f, "G({})", branch),
             SyntaxTree::Finally(branch) => write!(f, "F({})", branch),
-            SyntaxTree::And(branches) => write!(f, "({})∧({})", branches.0, branches.1),
-            SyntaxTree::Or(branches) => write!(f, "({})∨({})", branches.0, branches.1),
-            SyntaxTree::Implies(branches) => write!(f, "({})→({})", branches.0, branches.1),
-            SyntaxTree::Until(branches) => write!(f, "({})U({})", branches.0, branches.1),
+            SyntaxTree::And(left_branch, right_branch) => {
+                write!(f, "({})∧({})", left_branch, right_branch)
+            }
+            SyntaxTree::Or(left_branch, right_branch) => {
+                write!(f, "({})∨({})", left_branch, right_branch)
+            }
+            SyntaxTree::Implies(left_branch, right_branch) => {
+                write!(f, "({})→({})", left_branch, right_branch)
+            }
+            SyntaxTree::Until(left_branch, right_branch) => {
+                write!(f, "({})U({})", left_branch, right_branch)
+            }
         }
     }
 }
@@ -89,23 +97,31 @@ impl SyntaxTree {
             | SyntaxTree::Next(branch)
             | SyntaxTree::Globally(branch)
             | SyntaxTree::Finally(branch) => branch.as_ref().vars(),
-            SyntaxTree::And(branches)
-            | SyntaxTree::Or(branches)
-            | SyntaxTree::Implies(branches)
-            | SyntaxTree::Until(branches) => branches.0.vars().max(branches.1.vars()),
+            SyntaxTree::And(left_branch, right_branch)
+            | SyntaxTree::Or(left_branch, right_branch)
+            | SyntaxTree::Implies(left_branch, right_branch)
+            | SyntaxTree::Until(left_branch, right_branch) => {
+                left_branch.vars().max(right_branch.vars())
+            }
         }
     }
 
     /// Evaluate a formula on a trace.
     pub fn eval<const N: usize>(&self, trace: &[[bool; N]]) -> bool {
         match self {
-            SyntaxTree::Atom(var) => trace
+            SyntaxTree::Atom(var) => !trace.is_empty() && *trace
                 .first()
-                .map(|vals| {
-                    *(vals.get(*var as usize)
-                        .expect("interpret atomic proposition in trace"))
-                })
-                .unwrap_or(false),
+                // .unwrap_or(&[false; N])
+                .expect("interpret atomic proposition in trace")
+                .get(*var as usize)
+                .expect("interpret atomic proposition in trace"),
+                // .map(|vals| {
+                //     *(vals
+                //         .get(*var as usize)
+                //         .expect("interpret atomic proposition in trace"))
+                // })
+                // .unwrap_or(false),
+                // .expect("interpret atomic proposition in trace"),
             SyntaxTree::Not(branch) => !branch.eval(trace),
             SyntaxTree::Next(branch) => {
                 !trace.is_empty() && branch.eval(&trace[1..])
@@ -115,45 +131,44 @@ impl SyntaxTree {
                 //     branch.eval(&trace[1..])
                 // }
             }
-            SyntaxTree::Globally(branch) => (0..trace.len()).rev().all(|t| branch.eval(&trace[t..])),
+            // Globally and Finally are interpreted by reverse temporal order because interpreting on shorter traces is generally faster.
+            SyntaxTree::Globally(branch) => {
+                (0..trace.len()).rev().all(|t| branch.eval(&trace[t..]))
+            }
             SyntaxTree::Finally(branch) => (0..trace.len()).rev().any(|t| branch.eval(&trace[t..])),
-            SyntaxTree::And(branches) => {
-                let (left_branch, right_branch) = branches.as_ref();
+            SyntaxTree::And(left_branch, right_branch) => {
                 left_branch.eval(trace) && right_branch.eval(trace)
             }
-            SyntaxTree::Or(branches) => {
-                let (left_branch, right_branch) = branches.as_ref();
+            SyntaxTree::Or(left_branch, right_branch) => {
                 left_branch.eval(trace) || right_branch.eval(trace)
             }
-            SyntaxTree::Implies(branches) => {
-                let (left_branch, right_branch) = branches.as_ref();
+            SyntaxTree::Implies(left_branch, right_branch) => {
                 !left_branch.eval(trace) || right_branch.eval(trace)
             }
-            SyntaxTree::Until(branches) => {
-                let (left_branch, right_branch) = branches.as_ref();
+            SyntaxTree::Until(left_branch, right_branch) => {
                 // More compact but not any faster formulation
                 // !trace.is_empty() && (right_branch.eval(trace) || (left_branch.eval(trace) && self.eval(&trace[1..])))
-                if trace.is_empty() {
-                    false
-                } else if right_branch.eval(trace) {
-                    true
-                } else if !left_branch.eval(trace) {
-                    false
-                } else {
-                    self.eval(&trace[1..])
-                }
+                // if trace.is_empty() {
+                //     false
+                // } else if right_branch.eval(trace) {
+                //     true
+                // } else if !left_branch.eval(trace) {
+                //     false
+                // } else {
+                //     self.eval(&trace[1..])
+                // }
 
                 // Seems to be slightly slower, somehow?!?
-                // for t in 0..trace.len() {
-                //     let t_trace = &trace[t..];
-                //     if children.1.eval(t_trace) {
-                //         return true;
-                //     } else if !children.0.eval(t_trace) {
-                //         return false;
-                //     }
-                // }
-                // // Until is not satisfied if its right-hand-side argument never becomes true.
-                // false
+                for t in 0..trace.len() {
+                    let t_trace = &trace[t..];
+                    if right_branch.eval(t_trace) {
+                        return true;
+                    } else if !left_branch.eval(t_trace) {
+                        return false;
+                    }
+                }
+                // Until is not satisfied if its right-hand-side argument never becomes true.
+                false
             }
         }
     }
@@ -211,7 +226,7 @@ mod eval {
 
     #[test]
     fn and() {
-        let formula = SyntaxTree::And(Arc::new((ATOM_0, ATOM_1)));
+        let formula = SyntaxTree::And(Arc::new(ATOM_0), Arc::new(ATOM_1));
 
         let trace = [[true, true]];
         assert!(formula.eval(&trace));
@@ -222,7 +237,7 @@ mod eval {
 
     #[test]
     fn or() {
-        let formula = SyntaxTree::Or(Arc::new((ATOM_0, ATOM_1)));
+        let formula = SyntaxTree::Or(Arc::new(ATOM_0), Arc::new(ATOM_1));
 
         let trace = [[true, false]];
         assert!(formula.eval(&trace));
@@ -233,7 +248,7 @@ mod eval {
 
     #[test]
     fn until() {
-        let formula = SyntaxTree::Until(Arc::new((ATOM_0, ATOM_1)));
+        let formula = SyntaxTree::Until(Arc::new(ATOM_0), Arc::new(ATOM_1));
 
         let trace = [[true, false], [false, true], [false, false]];
         assert!(formula.eval(&trace));

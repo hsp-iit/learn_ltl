@@ -9,11 +9,13 @@ fn gen_formulae(c: &mut Criterion) {
     const VARS: usize = 5;
     const SIZE: usize = 8;
 
-    c.bench_function(&format!("generate formulae (size {SIZE}, vars {VARS})"), |b| {
-        b.iter(|| learn_pltl_fast::gen_formulae::<VARS>(SIZE));
-    });
+    c.bench_function(
+        &format!("generate formulae (size {SIZE}, vars {VARS})"),
+        |b| {
+            b.iter(|| learn_pltl_fast::gen_formulae::<VARS>(SIZE));
+        },
+    );
 }
-
 
 fn solve_sample(c: &mut Criterion) {
     let file = File::open("_sample_0077.ron").expect("open file");

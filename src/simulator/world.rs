@@ -372,6 +372,4 @@ impl World {
 
         (world, Box::new(task), Box::new(ai))
     }
-
-
 }

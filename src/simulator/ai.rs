@@ -98,13 +98,17 @@ impl Ai for AStarAi {
         {
             Action::Recharge
         } else if world.icub_charge * 10 < World::MAX_CHARGE * 7 {
-            if let Some(charging_station) = world.rooms.node_indices().find(|idx| world.rooms[*idx] == Room::ChargingStation) {
+            if let Some(charging_station) = world
+                .rooms
+                .node_indices()
+                .find(|idx| world.rooms[*idx] == Room::ChargingStation)
+            {
                 if let Some((node, edge)) = self.pathing(world, charging_station) {
                     Action::Move(node, edge)
                 } else {
                     Action::Wait
                 }
-            } else  if let Some((node, edge)) = self.pathing(world, self.goal) {
+            } else if let Some((node, edge)) = self.pathing(world, self.goal) {
                 Action::Move(node, edge)
             } else {
                 Action::Wait

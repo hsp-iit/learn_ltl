@@ -6,7 +6,7 @@ use std::sync::Arc;
 
 /// A tree structure with unary and binary nodes, but containing no data.
 #[derive(Debug, Clone)]
-enum SkeletonTree {
+pub enum SkeletonTree {
     Leaf,
     UnaryNode(Arc<SkeletonTree>),
     BinaryNode(Arc<(SkeletonTree, SkeletonTree)>),
@@ -15,7 +15,7 @@ enum SkeletonTree {
 impl SkeletonTree {
     /// Generates all possible `SkeletonTree`s of the given size,
     /// where the size is given by the number of leaves.
-    fn gen(size: usize) -> Vec<SkeletonTree> {
+    pub fn gen(size: usize) -> Vec<SkeletonTree> {
         match size {
             0 => panic!("No tree of size 0"),
             1 => vec![SkeletonTree::Leaf],
@@ -48,7 +48,7 @@ impl SkeletonTree {
     /// After being generated, a formula is checked under filtering criteria,
     /// and discarded if found to be equivalent to other formulae that have been or will included anyway.
     /// The const generic N represents the set of propositional variables which might appear in the generated formulae.
-    fn gen_formulae<const N: usize>(&self) -> Vec<SyntaxTree> {
+    pub fn gen_formulae<const N: usize>(&self) -> Vec<SyntaxTree> {
         match self {
             // Leaves of the `SkeletonTree` correspond to propositional variables
             SkeletonTree::Leaf => (0..N)
@@ -86,8 +86,18 @@ impl SkeletonTree {
             }
             // Binary nodes of the `SkeletonTree` correspond to binary operators of LTL
             SkeletonTree::BinaryNode(child) => {
-                let left_children = child.0.gen_formulae::<N>();
-                let right_children = child.1.gen_formulae::<N>();
+                let left_children: Vec<Arc<SyntaxTree>> = child
+                    .0
+                    .gen_formulae::<N>()
+                    .into_iter()
+                    .map(Arc::new)
+                    .collect();
+                let right_children: Vec<Arc<SyntaxTree>> = child
+                    .1
+                    .gen_formulae::<N>()
+                    .into_iter()
+                    .map(Arc::new)
+                    .collect();
                 // Use known bounds to allocate just as much memory as needed and avoid reallocations.
                 let mut trees = Vec::with_capacity(4 * left_children.len() * right_children.len());
                 let children = left_children
@@ -95,22 +105,20 @@ impl SkeletonTree {
                     .cartesian_product(right_children.into_iter());
 
                 for (left_child, right_child) in children {
-                    let children = Arc::new((left_child, right_child));
-
-                    if check_and(children.as_ref()) {
-                        trees.push(SyntaxTree::And(children.clone()));
+                    if check_and(left_child.as_ref(), right_child.as_ref()) {
+                        trees.push(SyntaxTree::And(left_child.clone(), right_child.clone()));
                     }
 
-                    if check_or(children.as_ref()) {
-                        trees.push(SyntaxTree::Or(children.clone()));
+                    if check_or(left_child.as_ref(), right_child.as_ref()) {
+                        trees.push(SyntaxTree::Or(left_child.clone(), right_child.clone()));
                     }
 
-                    if check_implies(children.as_ref()) {
-                        trees.push(SyntaxTree::Implies(children.clone()));
+                    if check_implies(left_child.as_ref(), right_child.as_ref()) {
+                        trees.push(SyntaxTree::Implies(left_child.clone(), right_child.clone()));
                     }
 
-                    if check_until(children.as_ref()) {
-                        trees.push(SyntaxTree::Until(children));
+                    if check_until(left_child.as_ref(), right_child.as_ref()) {
+                        trees.push(SyntaxTree::Until(left_child, right_child));
                     }
                 }
 
@@ -160,17 +168,17 @@ fn check_not(child: &SyntaxTree) -> bool {
         // ¬¬φ ≡ φ
         SyntaxTree::Not(_)
         // ¬(φ -> ψ) ≡ φ ∧ ¬ψ
-        | SyntaxTree::Implies(_)
+        | SyntaxTree::Implies(_, _)
         // ¬ F φ ≡ G ¬ φ
         | SyntaxTree::Finally(_) => false,
         // ¬(¬φ ∨ ψ) ≡ φ ∧ ¬ψ
-        SyntaxTree::Or(children)
+        SyntaxTree::Or(left_child, _)
         // ¬(¬φ ∧ ψ) ≡ φ ∨ ¬ψ
-        | SyntaxTree::And(children) if matches!(children.0, SyntaxTree::Not(_)) => false,
+        | SyntaxTree::And(left_child, _) if matches!(left_child.as_ref(), SyntaxTree::Not(_)) => false,
         // ¬(φ ∨ ¬ψ) ≡ ¬φ ∧ ψ
-        SyntaxTree::Or(children)
+        SyntaxTree::Or(_, right_child)
         // ¬(φ ∧ ¬ψ) ≡ ¬φ ∨ ψ
-        | SyntaxTree::And(children) if matches!(children.1, SyntaxTree::Not(_)) => false,
+        | SyntaxTree::And(_, right_child) if matches!(right_child.as_ref(), SyntaxTree::Not(_)) => false,
         _ => true,
     }
 }
@@ -207,7 +215,7 @@ fn check_finally(child: &SyntaxTree) -> bool {
     )
 }
 
-fn check_and((left_child, right_child): &(SyntaxTree, SyntaxTree)) -> bool {
+fn check_and(left_child: &SyntaxTree, right_child: &SyntaxTree) -> bool {
     // Commutative law WARNING: CORRECTNESS OF COMM+ASSOC IS NOT PROVEN
     left_child < right_child
     // left_child != right_child
@@ -219,7 +227,7 @@ fn check_and((left_child, right_child): &(SyntaxTree, SyntaxTree)) -> bool {
         // (.., SyntaxTree::Zeroary { op: ZeroaryOp::False })
         // | (SyntaxTree::Zeroary { op: ZeroaryOp::False }, ..)
         // Associative laws
-        | (SyntaxTree::And(_), _)
+        | (SyntaxTree::And(_, _), _)
         // De Morgan's laws
         | (SyntaxTree::Not(_), SyntaxTree::Not(_))
         // X (φ ∧ ψ) ≡ (X φ) ∧ (X ψ)
@@ -228,14 +236,14 @@ fn check_and((left_child, right_child): &(SyntaxTree, SyntaxTree)) -> bool {
         | (SyntaxTree::Globally(_), SyntaxTree::Globally(_)) => false,
         // (φ -> ψ_1) ∧ (φ -> ψ_2) ≡ φ -> (ψ_1 ∧ ψ_2)
         // (φ_1 -> ψ) ∧ (φ_2 -> ψ) ≡ (φ_1 ∨ φ_2) -> ψ
-        (SyntaxTree::Implies(c_1), SyntaxTree::Implies(c_2)) if c_1.0 == c_2.0 || c_1.1 == c_2.1 => false,
+        (SyntaxTree::Implies(c_1_0, c_1_1), SyntaxTree::Implies(c_2_0, c_2_1)) if c_1_0 == c_2_0 || c_1_1 == c_2_1 => false,
         // (φ_1 U ψ) ∧ (φ_2 U ψ) ≡ (φ_1 ∧ φ_2) U ψ
-        (SyntaxTree::Until(c_1), SyntaxTree::Until(c_2)) if c_1.1 == c_2.1 => false,
+        (SyntaxTree::Until(_, c_1), SyntaxTree::Until(_, c_2)) if c_1 == c_2 => false,
         // Absorption laws
-        (SyntaxTree::Or(children), right_child) if children.0 == *right_child || children.1 == *right_child => false,
-        (left_child, SyntaxTree::Or(children)) if children.0 == *left_child || children.1 == *left_child => false,
+        (SyntaxTree::Or(c_0, c_1), right_child) if c_0.as_ref() == right_child || c_1.as_ref() == right_child => false,
+        (left_child, SyntaxTree::Or(c_0, c_1)) if c_0.as_ref() == left_child || c_1.as_ref() == left_child => false,
         // Distributive laws
-        (SyntaxTree::Or(c_1), SyntaxTree::Or(c_2)) if c_1.0 == c_2.0 || c_1.0 == c_2.1 || c_1.1 == c_2.0 || c_1.1 == c_2.1 => false,
+        (SyntaxTree::Or(c_1_0, c_1_1), SyntaxTree::Or(c_2_0, c_2_1)) if c_1_0 == c_2_0 || c_1_0 == c_2_1 || c_1_1 == c_2_0 || c_1_1 == c_2_1 => false,
         // G φ ≡ φ ∧ X(G φ)
         (
             left_child,
@@ -258,7 +266,7 @@ fn check_and((left_child, right_child): &(SyntaxTree, SyntaxTree)) -> bool {
     }
 }
 
-fn check_or((left_child, right_child): &(SyntaxTree, SyntaxTree)) -> bool {
+fn check_or(left_child: &SyntaxTree, right_child: &SyntaxTree) -> bool {
     // Commutative law WARNING: CORRECTNESS OF COMM+ASSOC IS NOT PROVEN
     left_child < right_child
     // left_child != right_child
@@ -270,7 +278,7 @@ fn check_or((left_child, right_child): &(SyntaxTree, SyntaxTree)) -> bool {
         // (.., SyntaxTree::Zeroary { op: ZeroaryOp::False })
         // | (SyntaxTree::Zeroary { op: ZeroaryOp::False }, ..)
         // Associative laws
-        | (SyntaxTree::Or(_), _)
+        | (SyntaxTree::Or(_, _), _)
         // // De Morgan's laws
         // | (SyntaxTree::Unary { op: UnaryOp::Not, .. }, SyntaxTree::Unary { op: UnaryOp::Not, .. })
         // ¬φ ∨ ψ ≡ φ -> ψ, subsumes De Morgan's laws
@@ -281,14 +289,14 @@ fn check_or((left_child, right_child): &(SyntaxTree, SyntaxTree)) -> bool {
         | (SyntaxTree::Finally(_), SyntaxTree::Finally(_)) => false,
         // (φ -> ψ_1) ∨ (φ -> ψ_2) ≡ φ -> (ψ_1 ∨ ψ_2)
         // (φ_1 -> ψ) ∨ (φ_2 -> ψ) ≡ (φ_1 ∧ φ_2) -> ψ
-        (SyntaxTree::Implies(c_1), SyntaxTree::Implies(c_2)) if c_1.0 == c_2.0 || c_1.1 == c_2.1 => false,
+        (SyntaxTree::Implies(c_1_0, c_1_1), SyntaxTree::Implies(c_2_0, c_2_1)) if c_1_0 == c_2_0 || c_1_1 == c_2_1 => false,
         // (φ U ψ_1) ∨ (φ U ψ_2) ≡ φ U (ψ_1 ∨ ψ_2)
-        (SyntaxTree::Until(c_1), SyntaxTree::Until(c_2)) if c_1.0 == c_2.0 => false,
+        (SyntaxTree::Until(c_1, _), SyntaxTree::Until(c_2, _)) if c_1 == c_2 => false,
         // Absorption laws
-        (SyntaxTree::And(children), right_child) if children.0 == *right_child || children.1 == *right_child => false,
-        (left_child, SyntaxTree::And(children)) if children.0 == *left_child || children.1 == *left_child => false,
+        (SyntaxTree::And(c_0, c_1), right_child) if c_0.as_ref() == right_child || c_1.as_ref() == right_child => false,
+        (left_child, SyntaxTree::And(c_0, c_1)) if c_0.as_ref() == left_child || c_1.as_ref() == left_child => false,
         // Distributive laws
-        (SyntaxTree::And(c_1), SyntaxTree::And(c_2)) if c_1.0 == c_2.0 || c_1.0 == c_2.1 || c_1.1 == c_2.0 || c_1.1 == c_2.1 => false,
+        (SyntaxTree::And(c_1_0, c_1_1), SyntaxTree::And(c_2_0, c_2_1)) if c_1_0 == c_2_0 || c_1_0 == c_2_1 || c_1_1 == c_2_0 || c_1_1 == c_2_1 => false,
         // F φ ≡ φ ∨ X(F φ)
         (
             left_child,
@@ -311,13 +319,13 @@ fn check_or((left_child, right_child): &(SyntaxTree, SyntaxTree)) -> bool {
         // φ U ψ ≡ ψ ∨ ( X(φ U ψ) ∧ φ )
         (
             left_child,
-            SyntaxTree::And(c_1)
-        ) => if let SyntaxTree::Next(child) = &c_1.1 {
-                if let SyntaxTree::Until(c_2) = child.as_ref() {
-                    !(*left_child == c_2.1 && c_1.0 == c_2.0)
-            } else if let SyntaxTree::Next(child) = &c_1.0 {
-                if let SyntaxTree::Until(c_2) = child.as_ref() {
-                    !(*left_child == c_2.1 && c_1.1 == c_2.0)
+            SyntaxTree::And(c_1_0, c_1_1)
+        ) => if let SyntaxTree::Next(child) = c_1_1.as_ref() {
+                if let SyntaxTree::Until(c_2_0, c_2_1) = child.as_ref() {
+                    !(left_child == c_2_1.as_ref() && c_1_0 == c_2_0)
+            } else if let SyntaxTree::Next(child) = c_1_0.as_ref() {
+                if let SyntaxTree::Until(c_2_0, c_2_1) = child.as_ref() {
+                    !(left_child == c_2_1.as_ref() && c_1_1 == c_2_0)
                 } else {
                     true
                 }
@@ -330,14 +338,14 @@ fn check_or((left_child, right_child): &(SyntaxTree, SyntaxTree)) -> bool {
         // φ U ψ ≡ ( φ ∧ X(φ U ψ) ) ∨ ψ
         // φ U ψ ≡ ( X(φ U ψ) ∧ φ ) ∨ ψ
         (
-            SyntaxTree::And(c_1),
+            SyntaxTree::And(c_1_0, c_1_1),
             right_child
-        ) => if let SyntaxTree::Next(child) = &c_1.1 {
-                if let SyntaxTree::Until(c_2) = child.as_ref() {
-                    !(*right_child == c_2.1 && c_1.0 == c_2.0)
-            } else if let SyntaxTree::Next(child) = &c_1.0 {
-                if let SyntaxTree::Until(c_2) = child.as_ref() {
-                    !(*right_child == c_2.1 && c_1.1 == c_2.0)
+        ) => if let SyntaxTree::Next(child) = c_1_1.as_ref() {
+                if let SyntaxTree::Until(c_2_0, c_2_1) = child.as_ref() {
+                    !(right_child == c_2_1.as_ref() && c_1_0 == c_2_0)
+            } else if let SyntaxTree::Next(child) = c_1_0.as_ref() {
+                if let SyntaxTree::Until(c_2_0, c_2_1) = child.as_ref() {
+                    !(right_child == c_2_1.as_ref() && c_1_1 == c_2_0)
                 } else {
                     true
                 }
@@ -351,7 +359,7 @@ fn check_or((left_child, right_child): &(SyntaxTree, SyntaxTree)) -> bool {
     }
 }
 
-fn check_implies((left_child, right_child): &(SyntaxTree, SyntaxTree)) -> bool {
+fn check_implies(left_child: &SyntaxTree, right_child: &SyntaxTree) -> bool {
     left_child != right_child
         && !matches!(
             (left_child, right_child),
@@ -382,12 +390,12 @@ fn check_implies((left_child, right_child): &(SyntaxTree, SyntaxTree)) -> bool {
         // φ_1 -> (φ_2 -> ψ) ≡ (φ_1 ∧ φ_2) -> ψ
         | (
             _,
-            SyntaxTree::Implies(_),
+            SyntaxTree::Implies(_, _),
         )
         )
 }
 
-fn check_until((left_child, right_child): &(SyntaxTree, SyntaxTree)) -> bool {
+fn check_until(left_child: &SyntaxTree, right_child: &SyntaxTree) -> bool {
     // φ U φ ≡ φ
     left_child != right_child
         && match (left_child, right_child) {
@@ -408,7 +416,7 @@ fn check_until((left_child, right_child): &(SyntaxTree, SyntaxTree)) -> bool {
             // X (φ U ψ) ≡ (X φ) U (X ψ)
             (SyntaxTree::Next(_), SyntaxTree::Next(_)) => false,
             // φ U ψ ≡ φ U (φ U ψ)
-            (left_child, SyntaxTree::Until(children)) if *left_child == children.0 => false,
+            (left_child, SyntaxTree::Until(child, _)) if left_child == child.as_ref() => false,
             _ => true,
         }
 }

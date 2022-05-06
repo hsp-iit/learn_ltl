@@ -8,9 +8,9 @@ pub type Trace<const N: usize> = Vec<[bool; N]>;
 #[derive(Debug, Default, Serialize, Deserialize)]
 pub struct Sample<const N: usize> {
     #[serde_as(as = "Vec<Vec<[_; N]>>")]
-    positive_traces: Vec<Trace<N>>,
+    pub positive_traces: Vec<Trace<N>>,
     #[serde_as(as = "Vec<Vec<[_; N]>>")]
-    negative_traces: Vec<Trace<N>>,
+    pub negative_traces: Vec<Trace<N>>,
 }
 
 impl<const N: usize> Sample<N> {
@@ -98,7 +98,7 @@ mod consistency {
             ],
         };
 
-        let formula = SyntaxTree::And(Arc::new((ATOM_0, ATOM_1)));
+        let formula = SyntaxTree::And(Arc::new(ATOM_0), Arc::new(ATOM_1));
 
         assert!(sample.is_consistent(&formula));
     }
