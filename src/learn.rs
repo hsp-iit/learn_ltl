@@ -130,8 +130,8 @@ impl SkeletonTree {
             }
             // Binary nodes of the `SkeletonTree` correspond to binary operators of LTL
             SkeletonTree::BinaryNode(child) => {
-                let left_children = child.0.gen_formulae::<N>();
-                let right_children = child.1.gen_formulae::<N>();
+                let left_children: Vec<Arc<SyntaxTree>> = child.0.gen_formulae::<N>().into_iter().map(|tree| Arc::new(tree)).collect();
+                let right_children: Vec<Arc<SyntaxTree>> = child.1.gen_formulae::<N>().into_iter().map(|tree| Arc::new(tree)).collect();
                 // Use known bounds to allocate just as much memory as needed and avoid reallocations.
                 let mut trees = Vec::with_capacity(2 * left_children.len() * right_children.len());
                 let children = left_children
@@ -139,19 +139,20 @@ impl SkeletonTree {
                     .cartesian_product(right_children.into_iter());
 
                 for (left_child, right_child) in children {
-                    let children = Arc::new((left_child, right_child));
+                    let left_ref = left_child.as_ref();
+                    let right_ref = right_child.as_ref();
 
-                    if check_implies(children.as_ref()) {
+                    if check_implies(left_ref, right_ref) {
                         trees.push(SyntaxTree::Binary {
                             op: BinaryOp::Implies,
-                            children: children.clone(),
+                            children: (left_child.clone(), right_child.clone()),
                         });
                     }
 
-                    if check_until(children.as_ref()) {
+                    if check_until(left_ref, right_ref) {
                         trees.push(SyntaxTree::Binary {
                             op: BinaryOp::Until,
-                            children,
+                            children: (left_child, right_child),
                         });
                     }
                 }
@@ -174,13 +175,14 @@ impl SkeletonTree {
                                 skeleton
                                     .gen_formulae_xxx::<N>(false, true)
                                     .into_iter()
+                                    .map(|tree| Arc::new(tree))
                                     .combinations(multiplicity)
                             })
                             .multi_cartesian_product()
                             .filter_map(|tuples_of_subformulae| {
                                 let subformulae = tuples_of_subformulae.concat();
                                 if check_multi_and(&subformulae) {
-                                    Some(SyntaxTree::And(Arc::new(subformulae)))
+                                    Some(SyntaxTree::And(subformulae))
                                 } else {
                                     None
                                 }
@@ -197,13 +199,14 @@ impl SkeletonTree {
                                 skeleton
                                     .gen_formulae_xxx::<N>(true, false)
                                     .into_iter()
+                                    .map(|tree| Arc::new(tree))
                                     .combinations(multiplicity)
                             })
                             .multi_cartesian_product()
                             .filter_map(|tuples_of_subformulae| {
                                 let subformulae = tuples_of_subformulae.concat();
                                 if check_multi_or(&subformulae) {
-                                    Some(SyntaxTree::Or(Arc::new(subformulae)))
+                                    Some(SyntaxTree::Or(subformulae))
                                 } else {
                                     None
                                 }
@@ -259,7 +262,7 @@ fn check_not(child: &SyntaxTree) -> bool {
         // ¬(¬φ ∨ ψ) ≡ φ ∧ ¬ψ
         // | SyntaxTree::Binary { op: BinaryOp::And, children } if matches!(children.0, SyntaxTree::Unary { op: UnaryOp::Not, .. }) => false,
         SyntaxTree::And(branches)| SyntaxTree::Or(branches) => branches.iter().fold(0, |acc, formula| {
-            if matches!(formula, &SyntaxTree::Unary { op: UnaryOp::Not, .. }) {
+            if matches!(formula.as_ref(), &SyntaxTree::Unary { op: UnaryOp::Not, .. }) {
                 acc + 1
             } else {
                 acc - 1
@@ -367,17 +370,17 @@ fn check_finally(child: &SyntaxTree) -> bool {
 //     }
 // }
 
-fn check_multi_and(branches: &Vec<SyntaxTree>) -> bool {
+fn check_multi_and(branches: &Vec<Arc<SyntaxTree>>) -> bool {
     // ¬φ1 ∧ ¬φ2 ∧ ¬φ3 ∧ ψ1 ∧ ψ2 ∧ ψ3 ≡ ¬(φ1 ∨ φ2 ∨ φ3 ∨ ¬ψ1 ∨ ¬ψ2 ∨ ¬ψ3) ≡ ¬(ψ1 ∧ ψ2 ∧ ψ3 -> φ1 ∨ φ2 ∨ φ3)
     // (¬ φ) ∧ (¬ ψ) ≡ ¬ (φ ∨ ψ)
-    branches.iter().filter(|formula| matches!(formula, &SyntaxTree::Unary { op: UnaryOp::Not, .. })).count() < 2
+    branches.iter().filter(|formula| matches!(formula.as_ref(), &SyntaxTree::Unary { op: UnaryOp::Not, .. })).count() < 2
     // (X φ) ∧ (X ψ) ≡ X (φ ∧ ψ)
-    && branches.iter().filter(|formula| matches!(formula, &SyntaxTree::Unary { op: UnaryOp::Next, .. })).count() < 2
+    && branches.iter().filter(|formula| matches!(formula.as_ref(), &SyntaxTree::Unary { op: UnaryOp::Next, .. })).count() < 2
     // (G φ) ∧ (G ψ) ≡ X (G ∧ ψ)
-    && branches.iter().filter(|formula| matches!(formula, &SyntaxTree::Unary { op: UnaryOp::Globally, .. })).count() < 2
+    && branches.iter().filter(|formula| matches!(formula.as_ref(), &SyntaxTree::Unary { op: UnaryOp::Globally, .. })).count() < 2
     && !branches.iter().permutations(2).any(|subformulae| {
-        match (subformulae[0], subformulae[1]) {
-            (SyntaxTree::Or(children), right_child) => children.contains(right_child),
+        match (subformulae[0].as_ref(), subformulae[1].as_ref()) {
+            (SyntaxTree::Or(children), right_child) => children.contains(subformulae[1]),
             // G φ ≡ φ ∧ X(G φ)
             (
                 left_child,
@@ -394,7 +397,7 @@ fn check_multi_and(branches: &Vec<SyntaxTree>) -> bool {
         }
     })
     && !branches.iter().tuple_combinations().any(|(subformula_0, subformula_1)| {
-        match (subformula_0, subformula_1) {
+        match (subformula_0.as_ref(), subformula_1.as_ref()) {
             // Distributive laws
             (SyntaxTree::Or(branches_l), SyntaxTree::Or(branches_r)) => branches_l.iter().any(|formula_l| branches_r.contains(formula_l) ),
             // (φ -> ψ_1) ∧ (φ -> ψ_2) ≡ φ -> (ψ_1 ∧ ψ_2)
@@ -403,46 +406,49 @@ fn check_multi_and(branches: &Vec<SyntaxTree>) -> bool {
             // (φ_1 U ψ) ∧ (φ_2 U ψ) ≡ (φ_1 ∧ φ_2) U ψ
             (SyntaxTree::Binary { op: BinaryOp::Until, children: c_1 }, SyntaxTree::Binary { op: BinaryOp::Until, children: c_2 }) => c_1.1 == c_2.1,
             // Absorption laws
-            (SyntaxTree::Or(children), right_child) => children.contains(right_child),
+            (SyntaxTree::Or(children), _) => children.contains(subformula_1),
             _ => false,
         }
     })
 }
 
-fn check_multi_or(branches: &Vec<SyntaxTree>) -> bool {
+fn check_multi_or(branches: &Vec<Arc<SyntaxTree>>) -> bool {
     // ¬φ ∨ ψ ≡ φ -> ψ, subsumes De Morgan's laws
     // ¬φ ∨ ¬φ ∨ ¬φ ∨ ψ ∨ ψ ∨ ψ ≡ φ ∧ φ ∧ φ -> ψ ∨ ψ ∨ ψ
-    !branches.iter().any(|formula| matches!(formula, &SyntaxTree::Unary { op: UnaryOp::Not, .. }))
+    !branches.iter().any(|formula| matches!(formula.as_ref(), &SyntaxTree::Unary { op: UnaryOp::Not, .. }))
     // (X φ) ∨ (X ψ) ≡ X (φ ∨ ψ)
-    && branches.iter().filter(|formula| matches!(formula, &SyntaxTree::Unary { op: UnaryOp::Next, .. })).count() < 2
+    && branches.iter().filter(|formula| matches!(formula.as_ref(), &SyntaxTree::Unary { op: UnaryOp::Next, .. })).count() < 2
     // (F φ) ∨ (F ψ) ≡ F (φ ∨ ψ)
-    && branches.iter().filter(|formula| matches!(formula, &SyntaxTree::Unary { op: UnaryOp::Finally, .. })).count() < 2
+    && branches.iter().filter(|formula| matches!(formula.as_ref(), &SyntaxTree::Unary { op: UnaryOp::Finally, .. })).count() < 2
     && !branches.iter().permutations(2).any(|subformulas| {
-        match (subformulas[0], subformulas[1]) {
+        let left_subformula = subformulas[0].as_ref();
+        let right_subformula = subformulas[1].as_ref();
+
+        match (left_subformula, right_subformula) {
             //  Excluded middle
-            (child, SyntaxTree::Unary { op: UnaryOp::Not, child: neg_child }) => child == neg_child.as_ref(),
+            (child, &SyntaxTree::Unary { op: UnaryOp::Not, child: ref neg_child }) => child == neg_child.as_ref(),
             // Absorption laws, and
             // φ U ψ ≡ ψ ∨ ( φ ∧ X(φ U ψ) )
             // φ U ψ ≡ ψ ∨ ( X(φ U ψ) ∧ φ )
-            (left_child, SyntaxTree::And(children)) => children.contains(left_child) || children.iter().permutations(2).any(|and_subformulas| {
+            (left_child, SyntaxTree::And(children)) => children.contains(subformulas[0]) || children.iter().permutations(2).any(|and_subformulas| {
                 if let SyntaxTree::Unary {
                     op: UnaryOp::Next,
                     child,
-                } = and_subformulas[1] {
+                } = and_subformulas[1].as_ref() {
                     if let SyntaxTree::Binary {
                         op: BinaryOp::Until,
                         children: c_2,
                     } = child.as_ref() {
-                        !(*left_child == c_2.1 && *and_subformulas[0] == c_2.0)
+                        !(left_child == c_2.1.as_ref() && *and_subformulas[0] == c_2.0)
                     } else if let SyntaxTree::Unary {
                         op: UnaryOp::Next,
                         child,
-                    } = and_subformulas[0] {
+                    } = and_subformulas[0].as_ref() {
                         if let SyntaxTree::Binary {
                             op: BinaryOp::Until,
                             children: c_2,
                         } = child.as_ref() {
-                            *left_child == c_2.1 && *and_subformulas[1] == c_2.0
+                            left_child == c_2.1.as_ref() && *and_subformulas[1] == c_2.0
                         } else {
                             false
                         }
@@ -469,7 +475,7 @@ fn check_multi_or(branches: &Vec<SyntaxTree>) -> bool {
         }
     })
     && !branches.iter().tuple_combinations().any(|(subformula_0, subformula_1)| {
-        match (subformula_0, subformula_1) {
+        match (subformula_0.as_ref(), subformula_1.as_ref()) {
             // Distributive laws
             (SyntaxTree::And(branches_l), SyntaxTree::And(branches_r)) => branches_l.iter().any(|formula_l| branches_r.contains(formula_l) ),
             // (φ -> ψ_1) ∨ (φ -> ψ_2) ≡ φ -> (ψ_1 ∨ ψ_2)
@@ -611,7 +617,7 @@ fn check_multi_or(branches: &Vec<SyntaxTree>) -> bool {
 //     }
 // }
 
-fn check_implies((left_child, right_child): &(SyntaxTree, SyntaxTree)) -> bool {
+fn check_implies(left_child: &SyntaxTree, right_child: &SyntaxTree) -> bool {
     left_child != right_child
         && !matches!(
             (left_child, right_child),
@@ -656,7 +662,7 @@ fn check_implies((left_child, right_child): &(SyntaxTree, SyntaxTree)) -> bool {
         )
 }
 
-fn check_until((left_child, right_child): &(SyntaxTree, SyntaxTree)) -> bool {
+fn check_until(left_child: &SyntaxTree, right_child: &SyntaxTree) -> bool {
     // φ U φ ≡ φ
     left_child != right_child
         && match (left_child, right_child) {
@@ -690,7 +696,7 @@ fn check_until((left_child, right_child): &(SyntaxTree, SyntaxTree)) -> bool {
                     op: BinaryOp::Until,
                     children,
                 },
-            ) if *left_child == children.0 => false,
+            ) if left_child == children.0.as_ref() => false,
             _ => true,
         }
 }
