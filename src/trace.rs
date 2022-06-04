@@ -5,15 +5,36 @@ use serde_with::*;
 pub type Trace<const N: usize> = Vec<[bool; N]>;
 
 #[serde_as]
-#[derive(Debug, Default, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Sample<const N: usize> {
+    #[serde_as(as = "[_; N]")]
+    #[serde(default = "Sample::var_names")]
+    pub var_names: [String; N],
     #[serde_as(as = "Vec<Vec<[_; N]>>")]
     pub positive_traces: Vec<Trace<N>>,
     #[serde_as(as = "Vec<Vec<[_; N]>>")]
     pub negative_traces: Vec<Trace<N>>,
 }
 
+impl<const N: usize> Default for Sample<N> {
+    fn default() -> Self {
+        Sample {
+            var_names: Sample::var_names(),
+            positive_traces: Vec::default(),
+            negative_traces: Vec::default(),
+        }        
+    }
+}
+
 impl<const N: usize> Sample<N> {
+    fn var_names() -> [String; N] {
+        (0..N)
+            .map(|n| format!("x{n}"))
+            .collect::<Vec<_>>()
+            .try_into()
+            .expect("wrong size iterator")
+    }
+
     pub fn is_consistent(&self, formula: &SyntaxTree) -> bool {
         use itertools::*;
 
@@ -90,6 +111,7 @@ mod consistency {
     #[test]
     fn and() {
         let sample = Sample {
+            var_names: Sample::var_names(),
             positive_traces: vec![vec![[true, true]]],
             negative_traces: vec![
                 vec![[false, true]],

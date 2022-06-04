@@ -7,46 +7,6 @@ pub type Time = u8;
 /// The type of indexes of propositional variables.
 pub type Idx = u8;
 
-/// Unary operators.
-#[derive(Debug, Clone, Copy, PartialOrd, Ord, PartialEq, Eq, Deserialize)]
-pub enum UnaryOp {
-    Not,
-    Next,
-    Globally,
-    Finally,
-}
-
-impl fmt::Display for UnaryOp {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match *self {
-            UnaryOp::Globally => write!(f, "G"),
-            UnaryOp::Finally => write!(f, "F"),
-            UnaryOp::Next => write!(f, "X"),
-            UnaryOp::Not => write!(f, "¬"),
-        }
-    }
-}
-
-/// Binary operators
-#[derive(Debug, Clone, Copy, PartialOrd, Ord, PartialEq, Eq, Deserialize)]
-pub enum BinaryOp {
-    And,
-    Or,
-    Implies,
-    Until,
-}
-
-impl fmt::Display for BinaryOp {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match *self {
-            BinaryOp::And => write!(f, "∧"),
-            BinaryOp::Or => write!(f, "∨"),
-            BinaryOp::Implies => write!(f, "→"),
-            BinaryOp::Until => write!(f, "U"),
-        }
-    }
-}
-
 /// A formula represented via its syntax tree.
 /// This is a recursive data structure, so it requires the use of smart pointers.
 /// We use `Arc` to make it compatible with parallel computations.
@@ -88,6 +48,28 @@ impl fmt::Display for SyntaxTree {
 }
 
 impl SyntaxTree {
+    pub fn print_w_named_vars(&self, vars: &[String]) -> String {
+        match self {
+            SyntaxTree::Atom(var) => vars[*var as usize].clone(),
+            SyntaxTree::Not(branch) => format!("¬({})", branch.print_w_named_vars(vars)),
+            SyntaxTree::Next(branch) => format!("X({})", branch.print_w_named_vars(vars)),
+            SyntaxTree::Globally(branch) => format!("G({})", branch.print_w_named_vars(vars)),
+            SyntaxTree::Finally(branch) => format!("F({})", branch.print_w_named_vars(vars)),
+            SyntaxTree::And(left_branch, right_branch) => {
+                format!("({})∧({})", left_branch.print_w_named_vars(vars), right_branch.print_w_named_vars(vars))
+            }
+            SyntaxTree::Or(left_branch, right_branch) => {
+                format!("({})∨({})", left_branch.print_w_named_vars(vars), right_branch.print_w_named_vars(vars))
+            }
+            SyntaxTree::Implies(left_branch, right_branch) => {
+                format!("({})→({})", left_branch.print_w_named_vars(vars), right_branch.print_w_named_vars(vars))
+            }
+            SyntaxTree::Until(left_branch, right_branch) => {
+                format!("({})U({})", left_branch.print_w_named_vars(vars), right_branch.print_w_named_vars(vars))
+            }
+        }
+    }
+
     /// Returns the highest propositional variable index appearing in the formula, plus 1.
     /// Used to count how many variables are needed to interpret the formula.
     pub fn vars(&self) -> Idx {
