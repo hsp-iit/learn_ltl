@@ -48,15 +48,16 @@ impl SkeletonTree {
     /// After being generated, a formula is checked under filtering criteria,
     /// and discarded if found to be equivalent to other formulae that have been or will included anyway.
     /// The const generic N represents the set of propositional variables which might appear in the generated formulae.
-    pub fn gen_formulae<const N: usize>(&self) -> Vec<SyntaxTree> {
+    pub fn gen_formulae<const N: usize>(&self, vars: &[Idx]) -> Vec<SyntaxTree> {
         match self {
             // Leaves of the `SkeletonTree` correspond to propositional variables
-            SkeletonTree::Leaf => (0..N)
-                .map(|n| SyntaxTree::Atom(n as Idx))
+            SkeletonTree::Leaf => vars
+                .into_iter()
+                .map(|n| SyntaxTree::Atom(*n))
                 .collect::<Vec<SyntaxTree>>(),
             // Unary nodes of the `SkeletonTree` correspond to unary operators of LTL
             SkeletonTree::UnaryNode(child) => {
-                let children = child.gen_formulae::<N>();
+                let children = child.gen_formulae::<N>(vars);
                 // Use known bounds to allocate just as much memory as needed and avoid reallocations.
                 let mut trees = Vec::with_capacity(4 * children.len());
 
@@ -88,13 +89,13 @@ impl SkeletonTree {
             SkeletonTree::BinaryNode(child) => {
                 let left_children: Vec<Arc<SyntaxTree>> = child
                     .0
-                    .gen_formulae::<N>()
+                    .gen_formulae::<N>(vars)
                     .into_iter()
                     .map(Arc::new)
                     .collect();
                 let right_children: Vec<Arc<SyntaxTree>> = child
                     .1
-                    .gen_formulae::<N>()
+                    .gen_formulae::<N>(vars)
                     .into_iter()
                     .map(Arc::new)
                     .collect();
@@ -130,10 +131,10 @@ impl SkeletonTree {
     }
 }
 
-pub fn gen_formulae<const N: usize>(size: usize) -> Vec<SyntaxTree> {
+pub fn gen_formulae<const N: usize>(size: usize, vars: &[Idx]) -> Vec<SyntaxTree> {
     SkeletonTree::gen(size)
         .into_iter()
-        .flat_map(|skeleton| skeleton.gen_formulae::<N>())
+        .flat_map(|skeleton| skeleton.gen_formulae::<N>(vars))
         .collect_vec()
 }
 
@@ -142,6 +143,12 @@ pub fn gen_formulae<const N: usize>(size: usize) -> Vec<SyntaxTree> {
 // Parallel search is faster but less consistent then single-threaded search
 pub fn par_brute_solve<const N: usize>(sample: &Sample<N>, log: bool) -> Option<SyntaxTree> {
     use rayon::prelude::*;
+
+    if !sample.is_solvable() {
+        return None;
+    }
+
+    let vars = &sample.vars();
 
     (1..).into_iter().find_map(|size| {
         if log {
@@ -152,12 +159,12 @@ pub fn par_brute_solve<const N: usize>(sample: &Sample<N>, log: bool) -> Option<
         if size < 6 {
             SkeletonTree::gen(size)
                 .into_iter()
-                .flat_map(|skeleton| skeleton.gen_formulae::<N>())
+                .flat_map(|skeleton| skeleton.gen_formulae::<N>(vars))
                 .find(|formula| sample.is_consistent(formula))
         } else {
             SkeletonTree::gen(size)
                 .into_par_iter()
-                .flat_map(|skeleton| skeleton.gen_formulae::<N>())
+                .flat_map(|skeleton| skeleton.gen_formulae::<N>(vars))
                 .find_any(|formula| sample.is_consistent(formula))
         }
     })

@@ -1,4 +1,5 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use itertools::Itertools;
 use learn_pltl_fast::*;
 
 use std::fs::File;
@@ -12,7 +13,7 @@ fn gen_formulae(c: &mut Criterion) {
     c.bench_function(
         &format!("generate formulae (size {SIZE}, vars {VARS})"),
         |b| {
-            b.iter(|| learn_pltl_fast::gen_formulae::<VARS>(SIZE));
+            b.iter(|| learn_pltl_fast::gen_formulae::<VARS>(SIZE, (0..VARS as Idx).collect_vec().as_slice() ));
         },
     );
 }
