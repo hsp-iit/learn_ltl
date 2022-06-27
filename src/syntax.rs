@@ -2,7 +2,7 @@ use serde::Deserialize;
 use std::{fmt, sync::Arc};
 
 /// The type representing time instants.
-pub type Time = u8;
+pub type Time = usize;
 
 /// The type of indexes of propositional variables.
 pub type Idx = u8;
@@ -11,61 +11,94 @@ pub type Idx = u8;
 /// This is a recursive data structure, so it requires the use of smart pointers.
 /// We use `Arc` to make it compatible with parallel computations.
 #[derive(Debug, Clone, PartialOrd, Ord, PartialEq, Eq, Deserialize)]
-pub enum SyntaxTree {
-    Atom(Idx),
-    Not(Arc<SyntaxTree>),
-    Next(Arc<SyntaxTree>),
-    Globally(Arc<SyntaxTree>),
-    Finally(Arc<SyntaxTree>),
-    And(Arc<SyntaxTree>, Arc<SyntaxTree>),
-    Or(Arc<SyntaxTree>, Arc<SyntaxTree>),
-    Implies(Arc<SyntaxTree>, Arc<SyntaxTree>),
-    Until(Arc<SyntaxTree>, Arc<SyntaxTree>),
+pub enum LTLformula {
+    Atom(bool, Idx),
+    Not(Arc<LTLformula>),
+    Next(Arc<LTLformula>),
+    Globally(Arc<LTLformula>),
+    Finally(Arc<LTLformula>),
+    And(Arc<LTLformula>, Arc<LTLformula>),
+    Or(Arc<LTLformula>, Arc<LTLformula>),
+    // Implies(Arc<LTLformula>, Arc<LTLformula>),
+    Until(Arc<LTLformula>, Arc<LTLformula>),
+    Release(Arc<LTLformula>, Arc<LTLformula>),
 }
 
-impl fmt::Display for SyntaxTree {
+impl fmt::Display for LTLformula {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            SyntaxTree::Atom(var) => write!(f, "x{}", var),
-            SyntaxTree::Not(branch) => write!(f, "¬({})", branch),
-            SyntaxTree::Next(branch) => write!(f, "X({})", branch),
-            SyntaxTree::Globally(branch) => write!(f, "G({})", branch),
-            SyntaxTree::Finally(branch) => write!(f, "F({})", branch),
-            SyntaxTree::And(left_branch, right_branch) => {
-                write!(f, "({})∧({})", left_branch, right_branch)
+            LTLformula::Atom(true, var) => write!(f, "x{}", var),
+            LTLformula::Atom(false, var) => write!(f, "¬x{}", var),
+            LTLformula::Not(subformula) => write!(f, "¬({})", subformula),
+            LTLformula::Next(subformula) => write!(f, "X({})", subformula),
+            LTLformula::Globally(subformula) => write!(f, "G({})", subformula),
+            LTLformula::Finally(subformula) => write!(f, "F({})", subformula),
+            LTLformula::And(left_subformula, right_subformula) => {
+                write!(f, "({})∧({})", left_subformula, right_subformula)
             }
-            SyntaxTree::Or(left_branch, right_branch) => {
-                write!(f, "({})∨({})", left_branch, right_branch)
+            LTLformula::Or(left_subformula, right_subformula) => {
+                write!(f, "({})∨({})", left_subformula, right_subformula)
             }
-            SyntaxTree::Implies(left_branch, right_branch) => {
-                write!(f, "({})→({})", left_branch, right_branch)
+            // LTLformula::Implies(left_subformula, right_subformula) => {
+            //     write!(f, "({})→({})", left_subformula, right_subformula)
+            // }
+            LTLformula::Until(left_subformula, right_subformula) => {
+                write!(f, "({})U({})", left_subformula, right_subformula)
             }
-            SyntaxTree::Until(left_branch, right_branch) => {
-                write!(f, "({})U({})", left_branch, right_branch)
+            LTLformula::Release(left_subformula, right_subformula) => {
+                write!(f, "({})R({})", left_subformula, right_subformula)
             }
         }
     }
 }
 
-impl SyntaxTree {
+impl LTLformula {
     pub fn print_w_named_vars(&self, vars: &[String]) -> String {
         match self {
-            SyntaxTree::Atom(var) => vars[*var as usize].clone(),
-            SyntaxTree::Not(branch) => format!("¬({})", branch.print_w_named_vars(vars)),
-            SyntaxTree::Next(branch) => format!("X({})", branch.print_w_named_vars(vars)),
-            SyntaxTree::Globally(branch) => format!("G({})", branch.print_w_named_vars(vars)),
-            SyntaxTree::Finally(branch) => format!("F({})", branch.print_w_named_vars(vars)),
-            SyntaxTree::And(left_branch, right_branch) => {
-                format!("({})∧({})", left_branch.print_w_named_vars(vars), right_branch.print_w_named_vars(vars))
+            LTLformula::Atom(true, var) => vars[*var as usize].clone(),
+            LTLformula::Atom(false, var) => format!("¬({})", vars[*var as usize]),
+            LTLformula::Not(subformula) => format!("¬({})", subformula.print_w_named_vars(vars)),
+            LTLformula::Next(subformula) => format!("X({})", subformula.print_w_named_vars(vars)),
+            LTLformula::Globally(subformula) => {
+                format!("G({})", subformula.print_w_named_vars(vars))
             }
-            SyntaxTree::Or(left_branch, right_branch) => {
-                format!("({})∨({})", left_branch.print_w_named_vars(vars), right_branch.print_w_named_vars(vars))
+            LTLformula::Finally(subformula) => {
+                format!("F({})", subformula.print_w_named_vars(vars))
             }
-            SyntaxTree::Implies(left_branch, right_branch) => {
-                format!("({})→({})", left_branch.print_w_named_vars(vars), right_branch.print_w_named_vars(vars))
+            LTLformula::And(left_subformula, right_subformula) => {
+                format!(
+                    "({})∧({})",
+                    left_subformula.print_w_named_vars(vars),
+                    right_subformula.print_w_named_vars(vars)
+                )
             }
-            SyntaxTree::Until(left_branch, right_branch) => {
-                format!("({})U({})", left_branch.print_w_named_vars(vars), right_branch.print_w_named_vars(vars))
+            LTLformula::Or(left_subformula, right_subformula) => {
+                format!(
+                    "({})∨({})",
+                    left_subformula.print_w_named_vars(vars),
+                    right_subformula.print_w_named_vars(vars)
+                )
+            }
+            // LTLformula::Implies(left_subformula, right_subformula) => {
+            //     format!(
+            //         "({})→({})",
+            //         left_subformula.print_w_named_vars(vars),
+            //         right_subformula.print_w_named_vars(vars)
+            //     )
+            // }
+            LTLformula::Until(left_subformula, right_subformula) => {
+                format!(
+                    "({})U({})",
+                    left_subformula.print_w_named_vars(vars),
+                    right_subformula.print_w_named_vars(vars)
+                )
+            }
+            LTLformula::Release(left_subformula, right_subformula) => {
+                format!(
+                    "({})R({})",
+                    left_subformula.print_w_named_vars(vars),
+                    right_subformula.print_w_named_vars(vars)
+                )
             }
         }
     }
@@ -74,16 +107,17 @@ impl SyntaxTree {
     /// Used to count how many variables are needed to interpret the formula.
     pub fn vars(&self) -> Idx {
         match self {
-            SyntaxTree::Atom(n) => *n + 1,
-            SyntaxTree::Not(branch)
-            | SyntaxTree::Next(branch)
-            | SyntaxTree::Globally(branch)
-            | SyntaxTree::Finally(branch) => branch.as_ref().vars(),
-            SyntaxTree::And(left_branch, right_branch)
-            | SyntaxTree::Or(left_branch, right_branch)
-            | SyntaxTree::Implies(left_branch, right_branch)
-            | SyntaxTree::Until(left_branch, right_branch) => {
-                left_branch.vars().max(right_branch.vars())
+            LTLformula::Atom(_, n) => *n + 1,
+            LTLformula::Not(subformula)
+            | LTLformula::Next(subformula)
+            | LTLformula::Globally(subformula)
+            | LTLformula::Finally(subformula) => subformula.as_ref().vars(),
+            LTLformula::And(left_subformula, right_subformula)
+            | LTLformula::Or(left_subformula, right_subformula)
+            // | LTLformula::Implies(left_subformula, right_subformula)
+            | LTLformula::Release(left_subformula, right_subformula)
+            | LTLformula::Until(left_subformula, right_subformula) => {
+                left_subformula.vars().max(right_subformula.vars())
             }
         }
     }
@@ -91,66 +125,56 @@ impl SyntaxTree {
     /// Evaluate a formula on a trace.
     pub fn eval<const N: usize>(&self, trace: &[[bool; N]]) -> bool {
         match self {
-            SyntaxTree::Atom(var) => !trace.is_empty() && *trace
-                .first()
-                // .unwrap_or(&[false; N])
-                .expect("interpret atomic proposition in trace")
-                .get(*var as usize)
-                .expect("interpret atomic proposition in trace"),
-                // .map(|vals| {
-                //     *(vals
-                //         .get(*var as usize)
-                //         .expect("interpret atomic proposition in trace"))
-                // })
-                // .unwrap_or(false),
-                // .expect("interpret atomic proposition in trace"),
-            SyntaxTree::Not(branch) => !branch.eval(trace),
-            SyntaxTree::Next(branch) => {
-                !trace.is_empty() && branch.eval(&trace[1..])
-                // if trace.is_empty() {
-                //     false
-                // } else {
-                //     branch.eval(&trace[1..])
-                // }
+            LTLformula::Atom(pos, var) => {
+                !trace.is_empty()
+                    && *trace
+                        .first()
+                        .expect("interpret atomic proposition in trace")
+                        .get(*var as usize)
+                        .expect("interpret atomic proposition in trace")
+                        == *pos
             }
-            // Globally and Finally are interpreted by reverse temporal order because interpreting on shorter traces is generally faster.
-            SyntaxTree::Globally(branch) => {
-                (0..trace.len()).rev().all(|t| branch.eval(&trace[t..]))
+            LTLformula::Not(subformula) => !subformula.eval(trace),
+            LTLformula::Next(subformula) => !trace.is_empty() && subformula.eval(&trace[1..]),
+            // Globally is interpreted by reverse temporal order because interpreting on shorter traces is generally faster.
+            LTLformula::Globally(subformula) => {
+                (0..trace.len()).rev().all(|t| subformula.eval(&trace[t..]))
             }
-            SyntaxTree::Finally(branch) => (0..trace.len()).rev().any(|t| branch.eval(&trace[t..])),
-            SyntaxTree::And(left_branch, right_branch) => {
-                left_branch.eval(trace) && right_branch.eval(trace)
+            // Finally is interpreted by reverse temporal order because interpreting on shorter traces is generally faster.
+            LTLformula::Finally(subformula) => {
+                (0..trace.len()).rev().any(|t| subformula.eval(&trace[t..]))
             }
-            SyntaxTree::Or(left_branch, right_branch) => {
-                left_branch.eval(trace) || right_branch.eval(trace)
+            LTLformula::And(left_subformula, right_subformula) => {
+                left_subformula.eval(trace) && right_subformula.eval(trace)
             }
-            SyntaxTree::Implies(left_branch, right_branch) => {
-                !left_branch.eval(trace) || right_branch.eval(trace)
+            LTLformula::Or(left_subformula, right_subformula) => {
+                left_subformula.eval(trace) || right_subformula.eval(trace)
             }
-            SyntaxTree::Until(left_branch, right_branch) => {
-                // More compact but not any faster formulation
-                // !trace.is_empty() && (right_branch.eval(trace) || (left_branch.eval(trace) && self.eval(&trace[1..])))
-                // if trace.is_empty() {
-                //     false
-                // } else if right_branch.eval(trace) {
-                //     true
-                // } else if !left_branch.eval(trace) {
-                //     false
-                // } else {
-                //     self.eval(&trace[1..])
-                // }
-
-                // Seems to be slightly slower, somehow?!?
+            // LTLformula::Implies(left_subformula, right_subformula) => {
+            //     !left_subformula.eval(trace) || right_subformula.eval(trace)
+            // }
+            LTLformula::Until(left_subformula, right_subformula) => {
                 for t in 0..trace.len() {
                     let t_trace = &trace[t..];
-                    if right_branch.eval(t_trace) {
+                    if right_subformula.eval(t_trace) {
                         return true;
-                    } else if !left_branch.eval(t_trace) {
+                    } else if !left_subformula.eval(t_trace) {
                         return false;
                     }
                 }
                 // Until is not satisfied if its right-hand-side argument never becomes true.
                 false
+            }
+            LTLformula::Release(left_subformula, right_subformula) => {
+                for t in 0..trace.len() {
+                    let t_trace = &trace[t..];
+                    if !right_subformula.eval(t_trace) {
+                        return false;
+                    } else if left_subformula.eval(t_trace) {
+                        return true;
+                    }
+                }
+                true
             }
         }
     }
@@ -160,9 +184,9 @@ impl SyntaxTree {
 mod eval {
     use super::*;
 
-    const ATOM_0: SyntaxTree = SyntaxTree::Atom(0);
+    const ATOM_0: LTLformula = LTLformula::Atom(true, 0);
 
-    const ATOM_1: SyntaxTree = SyntaxTree::Atom(1);
+    const ATOM_1: LTLformula = LTLformula::Atom(true, 1);
 
     #[test]
     fn atomic_prop() {
@@ -175,7 +199,7 @@ mod eval {
 
     #[test]
     fn not() {
-        let formula = SyntaxTree::Not(Arc::new(ATOM_0));
+        let formula = LTLformula::Not(Arc::new(ATOM_0));
 
         let trace = [[false]];
         assert!(formula.eval(&trace));
@@ -186,7 +210,7 @@ mod eval {
 
     #[test]
     fn next() {
-        let formula = SyntaxTree::Next(Arc::new(ATOM_0));
+        let formula = LTLformula::Next(Arc::new(ATOM_0));
 
         let trace = [[false], [true]];
         assert!(formula.eval(&trace));
@@ -197,7 +221,7 @@ mod eval {
 
     #[test]
     fn globally() {
-        let formula = SyntaxTree::Globally(Arc::new(ATOM_0));
+        let formula = LTLformula::Globally(Arc::new(ATOM_0));
 
         let trace = [[true], [true], [true]];
         assert!(formula.eval(&trace));
@@ -208,7 +232,7 @@ mod eval {
 
     #[test]
     fn and() {
-        let formula = SyntaxTree::And(Arc::new(ATOM_0), Arc::new(ATOM_1));
+        let formula = LTLformula::And(Arc::new(ATOM_0), Arc::new(ATOM_1));
 
         let trace = [[true, true]];
         assert!(formula.eval(&trace));
@@ -219,7 +243,7 @@ mod eval {
 
     #[test]
     fn or() {
-        let formula = SyntaxTree::Or(Arc::new(ATOM_0), Arc::new(ATOM_1));
+        let formula = LTLformula::Or(Arc::new(ATOM_0), Arc::new(ATOM_1));
 
         let trace = [[true, false]];
         assert!(formula.eval(&trace));
@@ -230,7 +254,7 @@ mod eval {
 
     #[test]
     fn until() {
-        let formula = SyntaxTree::Until(Arc::new(ATOM_0), Arc::new(ATOM_1));
+        let formula = LTLformula::Until(Arc::new(ATOM_0), Arc::new(ATOM_1));
 
         let trace = [[true, false], [false, true], [false, false]];
         assert!(formula.eval(&trace));

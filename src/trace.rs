@@ -23,7 +23,7 @@ impl<const N: usize> Default for Sample<N> {
             var_names: Sample::var_names(),
             positive_traces: Vec::default(),
             negative_traces: Vec::default(),
-        }        
+        }
     }
 }
 
@@ -37,31 +37,35 @@ impl<const N: usize> Sample<N> {
     }
 
     pub fn vars(&self) -> Vec<Idx> {
-        self.var_names.iter().enumerate().filter_map(|(idx, name)| {
-            if name.starts_with('~') {
-                None
-            } else {
-                Some(idx as Idx)
-            }
-        })
-        .collect_vec()
+        self.var_names
+            .iter()
+            .enumerate()
+            .filter_map(|(idx, name)| {
+                if name.starts_with('~') {
+                    None
+                } else {
+                    Some(idx as Idx)
+                }
+            })
+            .collect_vec()
     }
 
     pub fn is_solvable(&self) -> bool {
         let vars = self.vars();
 
-        self.positive_traces.iter().all(|pos_trace|
-            self.negative_traces.iter().all(|neg_trace|
+        self.positive_traces.iter().all(|pos_trace| {
+            self.negative_traces.iter().all(|neg_trace| {
                 pos_trace.len() != neg_trace.len()
                     || pos_trace.iter().enumerate().any(|(time, &pos_tuple)| {
                         let neg_tuple = neg_trace[time];
-                        vars.iter().any(|n| pos_tuple[*n as usize] != neg_tuple[*n as usize])
+                        vars.iter()
+                            .any(|n| pos_tuple[*n as usize] != neg_tuple[*n as usize])
                     })
-            )
-        )
+            })
+        })
     }
 
-    pub fn is_consistent(&self, formula: &SyntaxTree) -> bool {
+    pub fn is_consistent(&self, formula: &LTLformula) -> bool {
         use itertools::*;
 
         self.positive_traces
@@ -130,9 +134,9 @@ mod consistency {
 
     use super::*;
 
-    const ATOM_0: SyntaxTree = SyntaxTree::Atom(0);
+    const ATOM_0: LTLformula = LTLformula::Atom(true, 0);
 
-    const ATOM_1: SyntaxTree = SyntaxTree::Atom(1);
+    const ATOM_1: LTLformula = LTLformula::Atom(true, 1);
 
     #[test]
     fn and() {
@@ -146,7 +150,7 @@ mod consistency {
             ],
         };
 
-        let formula = SyntaxTree::And(Arc::new(ATOM_0), Arc::new(ATOM_1));
+        let formula = LTLformula::And(Arc::new(ATOM_0), Arc::new(ATOM_1));
 
         assert!(sample.is_consistent(&formula));
     }

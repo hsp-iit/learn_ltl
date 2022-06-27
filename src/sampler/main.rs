@@ -33,7 +33,7 @@ fn main() -> std::io::Result<()> {
     let mut buf_reader = BufReader::new(file);
     let mut contents = Vec::new();
     buf_reader.read_to_end(&mut contents)?;
-    let formula = ron::de::from_bytes::<SyntaxTree>(&contents).expect("formula");
+    let formula = ron::de::from_bytes::<LTLformula>(&contents).expect("formula");
     let vars = formula.vars();
 
     let name = format!("sample_{}.ron", formula);
@@ -159,7 +159,7 @@ fn main() -> std::io::Result<()> {
 }
 
 fn sample<const N: usize>(
-    formula: &SyntaxTree,
+    formula: &LTLformula,
     positives: usize,
     negatives: usize,
     length: usize,
