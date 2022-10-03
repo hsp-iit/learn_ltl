@@ -13,7 +13,12 @@ fn gen_formulae(c: &mut Criterion) {
     c.bench_function(
         &format!("generate formulae (size {SIZE}, vars {VARS})"),
         |b| {
-            b.iter(|| learn_pltl_fast::gen_formulae::<VARS>(SIZE, (0..VARS as Idx).collect_vec().as_slice() ));
+            b.iter(|| {
+                learn_pltl_fast::gen_formulae::<VARS>(
+                    SIZE,
+                    (0..VARS as Idx).collect_vec().as_slice(),
+                )
+            });
         },
     );
 }

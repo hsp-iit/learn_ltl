@@ -13,6 +13,9 @@ struct Solver {
     /// Filename of the target sample.
     #[arg(short, long)]
     sample: String,
+    /// File format of the target sample.
+    #[arg(short, long)]
+    format: String,
 }
 
 fn main() -> std::io::Result<()> {
@@ -23,7 +26,17 @@ fn main() -> std::io::Result<()> {
     let mut contents = Vec::new();
     buf_reader.read_to_end(&mut contents)?;
 
-    if let Some(solution) = json_load_and_solve(contents) {
+    let load_and_solve = match solver.format.as_str() {
+        "ron" => ron_load_and_solve,
+        "json" => json_load_and_solve,
+        _ => {
+            println!("File format unknown or not supported: {}", solver.format);
+            return Ok(());
+            // return Err(std::io::Error::new(std::io::ErrorKind::Other, "Format unknown"))
+        }
+    };
+
+    if let Some(solution) = load_and_solve(contents) {
         println!("Solution: {}", solution);
     } else {
         println!("No solution found");
@@ -32,7 +45,7 @@ fn main() -> std::io::Result<()> {
     Ok(())
 }
 
-fn load_and_solve(contents: Vec<u8>) -> Option<String> {
+fn ron_load_and_solve(contents: Vec<u8>) -> Option<String> {
     // Ugly hack to get around limitations of deserialization for types with const generics.
     (1..).into_iter().find_map(|n| {
         match n {
