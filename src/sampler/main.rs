@@ -10,19 +10,19 @@ use std::io::Read;
 #[clap(name = "sampler")]
 struct Sampler {
     /// Filename of the target formula
-    #[clap(short, long)]
+    #[arg(short, long)]
     formula: String,
 
     /// Number of positive traces
-    #[clap(short, long)]
+    #[arg(short, long)]
     positives: usize,
 
     /// Number of negative traces
-    #[clap(short, long)]
+    #[arg(short, long)]
     negatives: usize,
 
     /// Length of traces
-    #[clap(short, long)]
+    #[arg(short, long)]
     length: usize,
 }
 
