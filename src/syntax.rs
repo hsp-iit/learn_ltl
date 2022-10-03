@@ -56,16 +56,32 @@ impl SyntaxTree {
             SyntaxTree::Globally(branch) => format!("G({})", branch.print_w_named_vars(vars)),
             SyntaxTree::Finally(branch) => format!("F({})", branch.print_w_named_vars(vars)),
             SyntaxTree::And(left_branch, right_branch) => {
-                format!("({})∧({})", left_branch.print_w_named_vars(vars), right_branch.print_w_named_vars(vars))
+                format!(
+                    "({})∧({})",
+                    left_branch.print_w_named_vars(vars),
+                    right_branch.print_w_named_vars(vars)
+                )
             }
             SyntaxTree::Or(left_branch, right_branch) => {
-                format!("({})∨({})", left_branch.print_w_named_vars(vars), right_branch.print_w_named_vars(vars))
+                format!(
+                    "({})∨({})",
+                    left_branch.print_w_named_vars(vars),
+                    right_branch.print_w_named_vars(vars)
+                )
             }
             SyntaxTree::Implies(left_branch, right_branch) => {
-                format!("({})→({})", left_branch.print_w_named_vars(vars), right_branch.print_w_named_vars(vars))
+                format!(
+                    "({})→({})",
+                    left_branch.print_w_named_vars(vars),
+                    right_branch.print_w_named_vars(vars)
+                )
             }
             SyntaxTree::Until(left_branch, right_branch) => {
-                format!("({})U({})", left_branch.print_w_named_vars(vars), right_branch.print_w_named_vars(vars))
+                format!(
+                    "({})U({})",
+                    left_branch.print_w_named_vars(vars),
+                    right_branch.print_w_named_vars(vars)
+                )
             }
         }
     }
@@ -91,19 +107,22 @@ impl SyntaxTree {
     /// Evaluate a formula on a trace.
     pub fn eval<const N: usize>(&self, trace: &[[bool; N]]) -> bool {
         match self {
-            SyntaxTree::Atom(var) => !trace.is_empty() && *trace
-                .first()
-                // .unwrap_or(&[false; N])
-                .expect("interpret atomic proposition in trace")
-                .get(*var as usize)
-                .expect("interpret atomic proposition in trace"),
-                // .map(|vals| {
-                //     *(vals
-                //         .get(*var as usize)
-                //         .expect("interpret atomic proposition in trace"))
-                // })
-                // .unwrap_or(false),
-                // .expect("interpret atomic proposition in trace"),
+            SyntaxTree::Atom(var) => {
+                !trace.is_empty()
+                    && *trace
+                        .first()
+                        // .unwrap_or(&[false; N])
+                        .expect("interpret atomic proposition in trace")
+                        .get(*var as usize)
+                        .expect("interpret atomic proposition in trace")
+            }
+            // .map(|vals| {
+            //     *(vals
+            //         .get(*var as usize)
+            //         .expect("interpret atomic proposition in trace"))
+            // })
+            // .unwrap_or(false),
+            // .expect("interpret atomic proposition in trace"),
             SyntaxTree::Not(branch) => !branch.eval(trace),
             SyntaxTree::Next(branch) => {
                 !trace.is_empty() && branch.eval(&trace[1..])
