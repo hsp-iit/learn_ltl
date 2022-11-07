@@ -9,6 +9,9 @@ which can be easily installed by using [rustup](https://rustup.rs/).
 The code has been tested on Linux with Rust 1.65, release toolchain,
 but it should work on any OS supported by Rust and with any Rust version supporting the 2021 edition (versions >=1.56).
 
+The `trace_generator` tool is a Python3 script.
+Install it according to your platform instructions.
+
 ## Building
 
 Inside the main folder, run:
@@ -54,11 +57,25 @@ Options:
   -h, --help             Print help information
 ```
 
+To discard a variable from a sample, open the sample with a text editor,
+find the name of the variable you want to ignore and add `~` at the beginning of the name.
+For example, to discard `X_1d1dd`, rename it to `~X_d1dd`.
+
 ## Generating samples
 
-To generate samples from a log file as obtained from [](),
-use the `trace_generator` tool
+To generate samples from a log file as those obtained from <https://github.com/SCOPE-ROBMOSYS/RAL2022-experiments>,
+use the `trace_generator` tool:
+
+```
+$ python3 trace_generator
+```
+
+and then follow the interactive script instructions.
 
 ## Experiments
 
-xxx
+Run the experiment with the sample obtained from <https://github.com/SCOPE-ROBMOSYS/RAL2022-experiments> with:
+
+```
+cargo run --release --bin solver -- --sample sample_simulator.json --format json
+```
