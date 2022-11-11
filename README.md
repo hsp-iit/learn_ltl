@@ -9,9 +9,6 @@ which can be easily installed by using [rustup](https://rustup.rs/).
 The code has been tested on Linux with Rust 1.65, release toolchain,
 but it should work on any OS supported by Rust and with any Rust version supporting the 2021 edition (versions >=1.56).
 
-The `trace_generator` tool is a Python3 script.
-Install it according to your platform instructions.
-
 ## Building
 
 Inside the main folder, run:
@@ -59,23 +56,23 @@ Options:
 
 To discard a variable from a sample, open the sample with a text editor,
 find the name of the variable you want to ignore and add `~` at the beginning of the name.
-For example, to discard `X_1d1dd`, rename it to `~X_d1dd`.
-
-## Generating samples
-
-To generate samples from a log file as those obtained from <https://github.com/SCOPE-ROBMOSYS/RAL2022-experiments>,
-use the `trace_generator` tool:
-
-```
-$ python3 trace_generator
-```
-
-and then follow the interactive script instructions.
+For example, to discard `X_d1dd`, rename it to `~X_d1dd`.
 
 ## Experiments
 
-Run the experiment with the sample obtained from <https://github.com/SCOPE-ROBMOSYS/RAL2022-experiments> with:
+The sample used for the experiments was obtained by:
+
+- Running the simulator from <https://github.com/SCOPE-ROBMOSYS/RAL2022-experiments> multiple times.
+- Turn the logs thus obtained into a sample using <https://github.com/piquet8/TraceGenerator_Script>.
+- (Optional) name the variables suitably.
+
+The logs and the sample can be found into the `R1experiments` folder.
+
+Then, a solution to the passive learning problem on this sample can be found with:
 
 ```
-cargo run --release --bin solver -- --sample sample_simulator.json --format json
+cargo run --release --bin solver -- --sample R1experiments/sample.json --format json
 ```
+
+For the second experiment, discard the variables `X_1d1dd` and `Y_1ddd` as explained above,
+i.e., by prefixing a `~` to their name.
