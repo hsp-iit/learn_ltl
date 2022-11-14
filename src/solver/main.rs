@@ -3,36 +3,37 @@ use learn_pltl_fast::*;
 use std::fs::File;
 use std::io::prelude::*;
 use std::io::BufReader;
+use std::path::Path;
 
 use clap::Parser;
 
 /// Search for a formula consistent with the given sample.
+/// Supported file types: ron, json.
 #[derive(Parser, Debug)]
 #[clap(name = "solver")]
 struct Solver {
-    /// Filename of the target sample.
-    #[arg(short, long)]
     sample: String,
-    /// File format of the target sample.
-    #[arg(short, long)]
-    format: String,
 }
 
 fn main() -> std::io::Result<()> {
     let solver = Solver::parse();
 
-    let file = File::open(solver.sample)?;
+    let path = Path::new(&solver.sample);
+    let file = File::open(path)?;
     let mut buf_reader = BufReader::new(file);
     let mut contents = Vec::new();
     buf_reader.read_to_end(&mut contents)?;
 
-    let load_and_solve = match solver.format.as_str() {
-        "ron" => ron_load_and_solve,
-        "json" => json_load_and_solve,
-        _ => {
-            println!("File format unknown or not supported: {}", solver.format);
+    let load_and_solve = match path.extension() {
+        Some(ext) if ext == "ron" => ron_load_and_solve,
+        Some(ext) if ext == "json" => json_load_and_solve,
+        Some(ext) => {
+            println!("File format unknown or not supported: {:#?}", ext);
             return Ok(());
-            // return Err(std::io::Error::new(std::io::ErrorKind::Other, "Format unknown"))
+        }
+        None => {
+            println!("File format missing");
+            return Ok(());
         }
     };
 
