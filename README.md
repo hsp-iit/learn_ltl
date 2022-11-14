@@ -23,35 +23,31 @@ You can safely ignore any compilation warning.
 
 The `solver` tool runs the learning algoritm on a sample to learn a formula consistent with it.
 
-If you have a sample in `.ron` format, you can run the solver on it with the following command:
+If you have a sample in `.ron` or `.json` format, you can run the solver on it with the following command:
 
 ```
-$ cargo run --release --bin solver -- --sample <path-to-sample> --format ron
-```
-
-Similarly, if you have a sample in `.json` format, you can run the solver on it with the following command:
-
-```
-$ cargo run --release --bin solver -- --sample <path-to-sample> --format json
+$ cargo run --release --bin solver -- <SAMPLE>
 ```
 
 Alternatively, you can invoke directly the compiled binary, which by default is at `target/release/solver`:
 
 ```
-$ <path-to-solver> --sample <path-to-sample> --format ron
+$ target/release/solver <SAMPLE>
 ```
+
 There is also a help file:
 
 ```
 $ target/release/solver --help
-Search for a formula consistent with the given sample
+Search for a formula consistent with the given sample. Supported file types: ron, json
 
-Usage: solver --sample <SAMPLE> --format <FORMAT>
+Usage: solver <SAMPLE>
+
+Arguments:
+  <SAMPLE>  
 
 Options:
-  -s, --sample <SAMPLE>  Filename of the target sample
-  -f, --format <FORMAT>  File format of the target sample
-  -h, --help             Print help information
+  -h, --help  Print help information
 ```
 
 To discard a variable from a sample, open the sample with a text editor,
@@ -71,7 +67,7 @@ The logs and the sample can be found into the `R1experiments` folder.
 Then, a solution to the passive learning problem on this sample can be found with:
 
 ```
-cargo run --release --bin solver -- --sample R1experiments/sample.json --format json
+cargo run --release --bin solver -- R1experiments/sample.json
 ```
 
 For the second experiment, discard the variables `X_1d1dd` and `Y_1ddd` as explained above,
