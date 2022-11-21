@@ -36,6 +36,8 @@ impl SkeletonTree {
                             .map(|branches| SkeletonTree::BinaryNode(Arc::new(branches))),
                     );
                 }
+                skeletons.shrink_to_fit();
+
                 skeletons
             }
         }
