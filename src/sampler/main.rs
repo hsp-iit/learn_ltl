@@ -1,5 +1,5 @@
 use clap::Parser;
-use learn_pltl_fast::*;
+use learn_ltl::*;
 use std::fs::File;
 use std::io::BufReader;
 use std::io::BufWriter;

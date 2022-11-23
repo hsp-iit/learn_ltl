@@ -1,10 +1,10 @@
 [package]
-name = "learn_pltl_fast"
+name = "learn_ltl"
 version = "0.1.0"
 edition = "2021"
 
 [lib]
-name = "learn_pltl_fast"
+name = "learn_ltl"
 path = "src/lib.rs"
 
 [[bin]]

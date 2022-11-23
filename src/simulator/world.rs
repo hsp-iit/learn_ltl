@@ -1,4 +1,4 @@
-use learn_pltl_fast::{Time, Trace};
+use learn_ltl::{Time, Trace};
 use petgraph::prelude::*;
 use rand::prelude::*;
 

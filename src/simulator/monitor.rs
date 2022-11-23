@@ -1,5 +1,5 @@
 use crate::world::*;
-use learn_pltl_fast::Time;
+use learn_ltl::Time;
 
 pub trait Monitor {
     fn get(&self, _world: &World) -> bool {

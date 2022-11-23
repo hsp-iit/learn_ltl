@@ -1,4 +1,4 @@
-use learn_pltl_fast::Sample;
+use learn_ltl::Sample;
 // use scenario::Scenario;
 use std::fs::File;
 use std::io::BufWriter;
