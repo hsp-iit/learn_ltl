@@ -226,6 +226,20 @@ mod eval {
     }
 
     #[test]
+    fn finally() {
+        let formula = SyntaxTree::Finally(Arc::new(ATOM_0));
+
+        let trace = [[false], [false], [true]];
+        assert!(formula.eval(&trace));
+
+        let trace = [[false], [true], [false]];
+        assert!(formula.eval(&trace));
+
+        let trace = [[false], [false], [false]];
+        assert!(!formula.eval(&trace));
+    }
+
+    #[test]
     fn and() {
         let formula = SyntaxTree::And(Arc::new(ATOM_0), Arc::new(ATOM_1));
 

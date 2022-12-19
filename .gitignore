@@ -1,8 +1,6 @@
 /target
 *.lock
-sample_*
 *.data
 *.folded
 *.old
-*.ron
 *.svg
