@@ -387,20 +387,20 @@ fn check_implies(left_child: &SyntaxTree, right_child: &SyntaxTree) -> bool {
             // (SyntaxTree::Unary { op: UnaryOp::Not, .. }, SyntaxTree::Unary { op: UnaryOp::Not, .. }) => false,
             // ¬φ -> ψ ≡ ψ ∨ φ
             (
-            SyntaxTree::Not(_),
-            _,
-        )
-        // φ -> ¬ψ ≡ ¬(ψ ∧ φ)
-        | (
-            _,
-            SyntaxTree::Not(_),
-        )
-        // Currying
-        // φ_1 -> (φ_2 -> ψ) ≡ (φ_1 ∧ φ_2) -> ψ
-        | (
-            _,
-            SyntaxTree::Implies(_, _),
-        )
+                SyntaxTree::Not(_),
+                _,
+            )
+            // φ -> ¬ψ ≡ ¬(ψ ∧ φ)
+            | (
+                _,
+                SyntaxTree::Not(_),
+            )
+            // Currying
+            // φ_1 -> (φ_2 -> ψ) ≡ (φ_1 ∧ φ_2) -> ψ
+            | (
+                _,
+                SyntaxTree::Implies(_, _),
+            )
         )
 }
 

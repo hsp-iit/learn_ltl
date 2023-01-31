@@ -221,6 +221,9 @@ mod eval {
         let trace = [[true], [true], [true]];
         assert!(formula.eval(&trace));
 
+        let trace: [[bool; 1]; 0] = [];
+        assert!(formula.eval(&trace));
+
         let trace = [[true], [false], [true]];
         assert!(!formula.eval(&trace));
     }
@@ -273,6 +276,9 @@ mod eval {
 
         // Until is not satisfied if its right-hand-side argument never becomes true.
         let trace = [[true, false], [true, false], [true, false]];
+        assert!(!formula.eval(&trace));
+
+        let trace: [[bool; 2]; 0] = [];
         assert!(!formula.eval(&trace));
     }
 }
