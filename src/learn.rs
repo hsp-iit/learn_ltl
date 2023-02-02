@@ -143,7 +143,7 @@ pub fn gen_formulae<const N: usize>(size: usize, vars: &[Idx]) -> Vec<SyntaxTree
 /// Find a formula consistent with the given `Sample`.
 /// Uses a fundamentally brute-force search algorithm.
 // Parallel search is faster but less consistent then single-threaded search
-pub fn par_brute_solve<const N: usize>(sample: &Sample<N>, log: bool) -> Option<SyntaxTree> {
+pub fn solve<const N: usize>(sample: &Sample<N>, multithread: bool, log: bool) -> Option<SyntaxTree> {
     use rayon::prelude::*;
 
     if !sample.is_solvable() {
@@ -158,16 +158,16 @@ pub fn par_brute_solve<const N: usize>(sample: &Sample<N>, log: bool) -> Option<
         }
         // At small size, the overhead for parallel iterators is not worth it.
         // At larger size, we use parallel iterators for speed.
-        if size < 6 {
-            SkeletonTree::gen(size)
-                .into_iter()
-                .flat_map(|skeleton| skeleton.gen_formulae::<N>(vars))
-                .find(|formula| sample.is_consistent(formula))
-        } else {
+        if multithread {
             SkeletonTree::gen(size)
                 .into_par_iter()
                 .flat_map(|skeleton| skeleton.gen_formulae::<N>(vars))
                 .find_any(|formula| sample.is_consistent(formula))
+        } else {
+            SkeletonTree::gen(size)
+                .into_iter()
+                .flat_map(|skeleton| skeleton.gen_formulae::<N>(vars))
+                .find(|formula| sample.is_consistent(formula))
         }
     })
 }
