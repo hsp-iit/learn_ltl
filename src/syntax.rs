@@ -125,7 +125,8 @@ impl SyntaxTree {
             // .expect("interpret atomic proposition in trace"),
             SyntaxTree::Not(branch) => !branch.eval(trace),
             SyntaxTree::Next(branch) => {
-                !trace.is_empty() && branch.eval(&trace[1..])
+                // !trace.is_empty() && branch.eval(&trace[1..])
+                trace.len() > 1 && branch.eval(&trace[1..])
                 // if trace.is_empty() {
                 //     false
                 // } else {
