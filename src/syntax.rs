@@ -106,70 +106,40 @@ impl SyntaxTree {
 
     /// Evaluate a formula on a trace.
     pub fn eval<const N: usize>(&self, trace: &[[bool; N]]) -> bool {
+        self.eval_at_time(trace, 0)
+    }
+
+    /// Evaluate a formula on a trace.
+    pub fn eval_at_time<const N: usize>(&self, trace: &[[bool; N]], time: usize) -> bool {
+        assert!(time < trace.len());
+
         match self {
-            SyntaxTree::Atom(var) => {
-                !trace.is_empty()
-                    && *trace
-                        .first()
-                        // .unwrap_or(&[false; N])
-                        .expect("interpret atomic proposition in trace")
-                        .get(*var as usize)
-                        .expect("interpret atomic proposition in trace")
-            }
-            // .map(|vals| {
-            //     *(vals
-            //         .get(*var as usize)
-            //         .expect("interpret atomic proposition in trace"))
-            // })
-            // .unwrap_or(false),
-            // .expect("interpret atomic proposition in trace"),
-            SyntaxTree::Not(branch) => !branch.eval(trace),
+            SyntaxTree::Atom(var) => trace[time][*var as usize],
+            SyntaxTree::Not(branch) => !branch.eval_at_time(trace, time),
             SyntaxTree::Next(branch) => {
-                // !trace.is_empty() && branch.eval(&trace[1..])
-                trace.len() > 1 && branch.eval(&trace[1..])
-                // if trace.is_empty() {
-                //     false
-                // } else {
-                //     branch.eval(&trace[1..])
-                // }
+                time + 1 < trace.len() && branch.eval_at_time(trace, time + 1)
             }
             // Globally and Finally are interpreted by reverse temporal order because interpreting on shorter traces is generally faster.
-            SyntaxTree::Globally(branch) => {
-                (0..trace.len()).rev().all(|t| branch.eval(&trace[t..]))
-            }
-            SyntaxTree::Finally(branch) => (0..trace.len()).rev().any(|t| branch.eval(&trace[t..])),
+            SyntaxTree::Globally(branch) => (time..trace.len()).rev().all(|t| branch.eval_at_time(trace, t)),
+            SyntaxTree::Finally(branch) => (time..trace.len()).rev().any(|t| branch.eval_at_time(trace, t)),
             SyntaxTree::And(left_branch, right_branch) => {
-                left_branch.eval(trace) && right_branch.eval(trace)
+                left_branch.eval_at_time(trace, time) && right_branch.eval_at_time(trace, time)
             }
             SyntaxTree::Or(left_branch, right_branch) => {
-                left_branch.eval(trace) || right_branch.eval(trace)
+                left_branch.eval_at_time(trace, time) || right_branch.eval_at_time(trace, time)
             }
             SyntaxTree::Implies(left_branch, right_branch) => {
-                !left_branch.eval(trace) || right_branch.eval(trace)
+                !left_branch.eval_at_time(trace, time) || right_branch.eval_at_time(trace, time)
             }
             SyntaxTree::Until(left_branch, right_branch) => {
-                // More compact but not any faster formulation
-                // !trace.is_empty() && (right_branch.eval(trace) || (left_branch.eval(trace) && self.eval(&trace[1..])))
-                // if trace.is_empty() {
-                //     false
-                // } else if right_branch.eval(trace) {
-                //     true
-                // } else if !left_branch.eval(trace) {
-                //     false
-                // } else {
-                //     self.eval(&trace[1..])
-                // }
-
-                // Seems to be slightly slower, somehow?!?
-                for t in 0..trace.len() {
-                    let t_trace = &trace[t..];
-                    if right_branch.eval(t_trace) {
+                for t in time..trace.len() {
+                    if right_branch.eval_at_time(trace, t) {
                         return true;
-                    } else if !left_branch.eval(t_trace) {
+                    } else if !left_branch.eval_at_time(trace, t) {
                         return false;
                     }
                 }
-                // Until is not satisfied if its right-hand-side argument never becomes true.
+                // (Strong) Until is not satisfied if its right-hand-side argument never becomes true.
                 false
             }
         }
@@ -191,6 +161,9 @@ mod eval {
 
         let trace = [[false]];
         assert!(!ATOM_0.eval(&trace));
+
+        // let trace: [[bool; 1]; 0] = [];
+        // assert!(!ATOM_0.eval(&trace));
     }
 
     #[test]
@@ -222,11 +195,12 @@ mod eval {
         let trace = [[true], [true], [true]];
         assert!(formula.eval(&trace));
 
-        let trace: [[bool; 1]; 0] = [];
-        assert!(formula.eval(&trace));
-
         let trace = [[true], [false], [true]];
         assert!(!formula.eval(&trace));
+        
+        // // Not even Globally can be true at moment 0 on an empty trace
+        // let trace: [[bool; 1]; 0] = [];
+        // assert!(!formula.eval(&trace));
     }
 
     #[test]
@@ -279,7 +253,7 @@ mod eval {
         let trace = [[true, false], [true, false], [true, false]];
         assert!(!formula.eval(&trace));
 
-        let trace: [[bool; 2]; 0] = [];
-        assert!(!formula.eval(&trace));
+        // let trace: [[bool; 2]; 0] = [];
+        // assert!(!formula.eval(&trace));
     }
 }

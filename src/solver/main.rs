@@ -50,6 +50,7 @@ fn main() -> std::io::Result<()> {
 
 fn ron_load_and_solve(contents: Vec<u8>, multithread: bool) -> Option<String> {
     // Ugly hack to get around limitations of deserialization for types with const generics.
+    // See https://github.com/serde-rs/serde/issues/1937
     (1..).into_iter().find_map(|n| {
         match n {
             0 => ron::de::from_bytes::<Sample<0>>(&contents).map(|sample| {
