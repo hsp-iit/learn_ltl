@@ -12,7 +12,9 @@ use clap::Parser;
 #[derive(Parser, Debug)]
 #[clap(name = "solver")]
 struct Solver {
+    /// The sample for which to learn a solving formula
     sample: String,
+    /// Use parallel search via multithreading
     #[arg(short, long, default_value_t = false)]
     multithread: bool,
 }
