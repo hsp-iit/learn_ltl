@@ -120,8 +120,12 @@ impl SyntaxTree {
                 time + 1 < trace.len() && branch.eval_at_time(trace, time + 1)
             }
             // Globally and Finally are interpreted by reverse temporal order because interpreting on shorter traces is generally faster.
-            SyntaxTree::Globally(branch) => (time..trace.len()).rev().all(|t| branch.eval_at_time(trace, t)),
-            SyntaxTree::Finally(branch) => (time..trace.len()).rev().any(|t| branch.eval_at_time(trace, t)),
+            SyntaxTree::Globally(branch) => (time..trace.len())
+                .rev()
+                .all(|t| branch.eval_at_time(trace, t)),
+            SyntaxTree::Finally(branch) => (time..trace.len())
+                .rev()
+                .any(|t| branch.eval_at_time(trace, t)),
             SyntaxTree::And(left_branch, right_branch) => {
                 left_branch.eval_at_time(trace, time) && right_branch.eval_at_time(trace, time)
             }
@@ -197,7 +201,7 @@ mod eval {
 
         let trace = [[true], [false], [true]];
         assert!(!formula.eval(&trace));
-        
+
         // // Not even Globally can be true at moment 0 on an empty trace
         // let trace: [[bool; 1]; 0] = [];
         // assert!(!formula.eval(&trace));

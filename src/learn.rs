@@ -143,7 +143,11 @@ pub fn gen_formulae<const N: usize>(size: usize, vars: &[Idx]) -> Vec<SyntaxTree
 /// Find a formula consistent with the given `Sample`.
 /// Uses a fundamentally brute-force search algorithm.
 // Parallel search is faster but less consistent then single-threaded search
-pub fn solve<const N: usize>(sample: &Sample<N>, multithread: bool, log: bool) -> Option<SyntaxTree> {
+pub fn solve<const N: usize>(
+    sample: &Sample<N>,
+    multithread: bool,
+    log: bool,
+) -> Option<SyntaxTree> {
     use rayon::prelude::*;
 
     if !sample.is_solvable() {
@@ -196,7 +200,7 @@ fn check_next(child: &SyntaxTree) -> bool {
     !matches!(
         child,
         // X ¬ φ ≡ ¬ X φ // FALSE on finite trace semantics: neXt and Not do not commute on a trace of length 1!
-        // SyntaxTree::Not(_) 
+        // SyntaxTree::Not(_)
         // X G φ ≡ G X φ // FALSE on finite trace semantics: GX(...) = False on any trace!
         // SyntaxTree::Globally(_)
         // X F φ ≡ F X φ // Holds even on finite trace semantics
@@ -208,8 +212,7 @@ fn check_globally(child: &SyntaxTree) -> bool {
     !matches!(
         child,
         // G G φ ≡ G φ
-        SyntaxTree::Globally(_) 
-        | SyntaxTree::Next(_) // On finite trace semantics: GX(...) = False on any trace!
+        SyntaxTree::Globally(_) | SyntaxTree::Next(_) // On finite trace semantics: GX(...) = False on any trace!
     )
 }
 
