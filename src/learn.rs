@@ -195,10 +195,12 @@ fn check_not(child: &SyntaxTree) -> bool {
 fn check_next(child: &SyntaxTree) -> bool {
     !matches!(
         child,
-        // X ¬ φ ≡ ¬ X φ
-        // X G φ ≡ G X φ
-        // X F φ ≡ F X φ
-        SyntaxTree::Not(_) | SyntaxTree::Globally(_) | SyntaxTree::Finally(_)
+        // X ¬ φ ≡ ¬ X φ // FALSE on finite trace semantics: neXt and Not do not commute on a trace of length 1!
+        // SyntaxTree::Not(_) 
+        // X G φ ≡ G X φ // FALSE on finite trace semantics: GX(...) = False on any trace!
+        // SyntaxTree::Globally(_)
+        // X F φ ≡ F X φ // Holds even on finite trace semantics
+        SyntaxTree::Finally(_)
     )
 }
 
@@ -206,10 +208,8 @@ fn check_globally(child: &SyntaxTree) -> bool {
     !matches!(
         child,
         // G G φ ≡ G φ
-        SyntaxTree::Globally(_) // // X G φ ≡ G X φ
-                                // | SyntaxTree::Unary { op: UnaryOp::Next, .. }
-                                // // G False ≡ False
-                                // | SyntaxTree::Zeroary { op: ZeroaryOp::False }
+        SyntaxTree::Globally(_) 
+        | SyntaxTree::Next(_) // On finite trace semantics: GX(...) = False on any trace!
     )
 }
 
@@ -253,24 +253,26 @@ fn check_and(left_child: &SyntaxTree, right_child: &SyntaxTree) -> bool {
         (left_child, SyntaxTree::Or(c_0, c_1)) if c_0.as_ref() == left_child || c_1.as_ref() == left_child => false,
         // Distributive laws
         (SyntaxTree::Or(c_1_0, c_1_1), SyntaxTree::Or(c_2_0, c_2_1)) if c_1_0 == c_2_0 || c_1_0 == c_2_1 || c_1_1 == c_2_0 || c_1_1 == c_2_1 => false,
-        // G φ ≡ φ ∧ X(G φ)
-        (
-            left_child,
-            SyntaxTree::Next(child)
-        ) => if let SyntaxTree::Globally(child) = child.as_ref() {
-            child.as_ref() != left_child
-        } else {
-            true
-        },
-        // G φ ≡ X(G φ) ∧ φ
-        (
-            SyntaxTree::Next(child),
-            right_child,
-        ) => if let SyntaxTree::Globally(child) = child.as_ref() {
-            child.as_ref() != right_child
-        } else {
-            true
-        },
+        // Does not hold in LTL_f
+        // // G φ ≡ φ ∧ X(G φ)
+        // (
+        //     left_child,
+        //     SyntaxTree::Next(child)
+        // ) => if let SyntaxTree::Globally(child) = child.as_ref() {
+        //     child.as_ref() != left_child
+        // } else {
+        //     true
+        // },
+        // Does not hold in LTL_f
+        // // G φ ≡ X(G φ) ∧ φ
+        // (
+        //     SyntaxTree::Next(child),
+        //     right_child,
+        // ) => if let SyntaxTree::Globally(child) = child.as_ref() {
+        //     child.as_ref() != right_child
+        // } else {
+        //     true
+        // },
         _ => true,
     }
 }
